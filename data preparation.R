@@ -47,6 +47,12 @@ r2 <- abs2011_1km[[1]]
 ecor1km <- resample(eco, abs2011_1km)
 abs2011_1km <- addLayer(abs2011_1km, ecor1km)
 names(abs2011_1km)[nlayers(abs2011_1km)] <- "eco"
+
+wtbl <- raster("D:/CHID regional NS BRT/watertableNNS_LCC.tif")
+wtbl1km<-aggregate(wtbl,fact=4,fun=modal)
+abs2011_1km <- addLayer(abs2011_1km, wtbl1km)
+names(abs2011_1km)[nlayers(abs2011_1km)] <- "wtbl"
+
 writeRaster(abs2011_1km,"NS2011rasters",overwrite=TRUE)
 
 b2001 <- list.files("M:/DataStuff/SpatialData/Beaudoin/2001/",pattern="tif$")
@@ -61,7 +67,8 @@ dat2011 <-cbind(dat2011,extract(nalc,as.matrix(cbind(dat2011$X,dat2011$Y))))
 names(dat2011)[ncol(dat2011)] <- "LCC"
 dat2011 <-cbind(dat2011,extract(eco,as.matrix(cbind(dat2011$X,dat2011$Y))))
 names(dat2011)[ncol(dat2011)] <- "eco"
-
+dat2011<-cbind(dat2011,extract(wtbl,as.matrix(cbind(dat2011$X,dat2011$Y))))
+names(dat2011)[ncol(dat2011)] <- "wtbl"
 
 samprast2011 <- rasterize(cbind(dat2011$X,dat2011$Y), r2, field=1)
 sampsum25 <- focal(samprast2011, w=matrix(1/25, nc=5, nr=5), na.rm=TRUE)
@@ -83,6 +90,8 @@ dat2001 <-cbind(dat2001,extract(nalc,as.matrix(cbind(dat2001$X,dat2001$Y))))
 names(dat2001)[ncol(dat2001)] <- "LCC"
 dat2001 <-cbind(dat2001,extract(eco,as.matrix(cbind(dat2001$X,dat2001$Y))))
 names(dat2001)[ncol(dat2001)] <- "eco"
+dat2001<-cbind(dat2001,extract(wtbl,as.matrix(cbind(dat2001$X,dat2001$Y))))
+names(dat2001)[ncol(dat2001)] <- "wtbl"
 
 samprast2001 <- rasterize(cbind(dat2001$X,dat2001$Y), r2, field=1)
 sampsum25 <- focal(samprast2001, w=matrix(1/25, nc=5, nr=5), na.rm=TRUE) 
