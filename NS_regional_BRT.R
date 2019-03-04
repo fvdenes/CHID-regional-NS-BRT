@@ -1,5 +1,4 @@
 library(raster)
-library(dismo)
 library(rpart)
 library(maptools)
 library(data.table)
@@ -7,6 +6,7 @@ library(rgdal)
 library(dplyr)
 library(blockCV)
 library(sp)
+library(dismo)
 
 # A function that fits the BRT model ('gbm.step' from dismo package) on pre-defined folds, and saves outputs ####
 brt_blocks <- function(data = datcombo, pred.stack = pred_abs_2011, seed = 1222, pred.variables ,output.folder, blocks=NULL, keep.out = TRUE, tc=3,lr=0.001,bf=0.5, save.points.shp=FALSE){ 
@@ -108,7 +108,7 @@ brt_blocks <- function(data = datcombo, pred.stack = pred_abs_2011, seed = 1222,
     }
     
     else {
-      save(blocks, file = paste(z, speclist[j], "blocks", sep = ""))
+      save(blocks, file = paste(z, speclist[j], "blocks.R", sep = ""))
       save(brt, file = paste(z, speclist[j], "brtAB.R", sep = ""))
     }  
     
@@ -171,75 +171,6 @@ brt_blocks <- function(data = datcombo, pred.stack = pred_abs_2011, seed = 1222,
     
     if(keep.out==T) {return(brt)}
   }
-}
-
-# A function to obtain confidence intervals of model predictions ####
-
-boot_brt<-function(data,brtmodel,blocks,pred.data,nsamples=100){
-  rast <-  predict(pred.data,
-                   brtmodel,
-                   type = "response",
-                   n.trees = brtmodel$n.trees)
-  stack<-stack(rast)
-  names(stack)[1]<-"model estimate"
-  
-  for(i in 1:nsamples){
-    sample<-sample(1:nrow(data),size=nrow(data),replace=T)
-    data2<-data[sample,]
-    x1<- try(brt <-
-               gbm.step(
-                 data = data2,
-                 gbm.y = brtmodel$gbm.call$gbm.y,
-                 gbm.x = brtmodel$gbm.call$gbm.x,
-                 fold.vector = blocks$foldID[sample],
-                 n.folds = brtmodel$gbm.call$cv.folds,
-                 family = brtmodel$gbm.call$family,
-                 tree.complexity = brtmodel$gbm.call$tree.complexity,
-                 learning.rate = brtmodel$gbm.call$learning.rate,
-                 bag.fraction = brtmodel$gbm.call$bag.fraction,
-                 offset = brtmodel$gbm.call$offset[sample],
-                 site.weights = data2$wt
-               ))
-    
-    if(class(x1)=="NULL"){
-      sample<-sample(1:nrow(data),size=nrow(data),replace=T)
-      x1<- try(brt <-
-                 gbm.step(
-                   data = data2,
-                   gbm.y = brtmodel$gbm.call$gbm.y,
-                   gbm.x = brtmodel$gbm.call$gbm.x,
-                   fold.vector = blocks$foldID[sample],
-                   n.folds = brtmodel$gbm.call$cv.folds,
-                   family = brtmodel$gbm.call$family,
-                   tree.complexity = brtmodel$gbm.call$tree.complexity,
-                   learning.rate = brtmodel$gbm.call$learning.rate,
-                   bag.fraction = brtmodel$gbm.call$bag.fraction,
-                   offset = brtmodel$gbm.call$offset[sample],
-                   site.weights = data2$wt
-                 ))
-    }
-    
-    
-    
-    rast <- predict(pred.data,
-                    brt,
-                    type = "response",
-                    n.trees = brt$n.trees)
-    stack <- addLayer(stack, rast)
-    names(stack)[i+1]<-paste0("sample",i) 
-  }
-  
-  fun0.05 <- function(x) {quantile(x, probs = 0.05, na.rm = TRUE)}
-  lower<- calc(stack[[-1]],fun0.05)
-  fun0.95 <- function(x) {quantile(x, probs = 0.95, na.rm = TRUE)}
-  upper<- calc(stack[[-1]],fun0.95)
-  
-  stack <- addLayer(stack,lower)
-  names(stack)[nlayers(stack)]<-"lower"
-  
-  stack <- addLayer(stack,lower)
-  names(stack)[nsamples+1]<-"upper"
-  return(stack)
 }
 
 #load data and prepare objects ####
@@ -371,13 +302,6 @@ pred.variables<-c(
   "watNNS",
   "watNNS_Gauss250",
   "watNNS_Gauss750"
-  #,"AHM",
-  #"DD_0",
-  #"MAT",
-  #"MAP",
-  #"DD5",
-  #"MWMT",
-  #"MCMT"
 )
   
   # create object storing the indices of predictor layers (from the prediction dataset) for the autocorrelation assessment that will inform block size. Only include continuous numeric variables here. Can use indexing "[-c(x:y)] to exclude them (e.g. exclude climate variables, HF, etc).
@@ -412,13 +336,6 @@ end_time-start_time
 
 
 
-start_time <- Sys.time()
-confintBRT1<-boot_brt(datcombo,brt1,sp_block_full,pred_abs_2011,10)
-end_time <- Sys.time()
-end_time - start_time
-
-writeRaster(confintBRT1,filename = "D://CHID regional NS BRT/BRT_outputs/full_model/confint.grd",format = "raster", overwrite = TRUE)
-
 
 
 # Simplified model (selecting most influential scales) ####
@@ -429,27 +346,27 @@ pred.variables2<-c(
   "Species_Acer_Sah_v1",#
   #"Species_Acer_Sah_v1_Gauss250",#
   #"Species_Acer_Sah_v1_Gauss750",#
-  #"Species_Acer_Rub_v1",#
+  "Species_Acer_Rub_v1",#
   #"Species_Acer_Rub_v1_Gauss250",#
-  "Species_Acer_Rub_v1_Gauss750",#
+  #"Species_Acer_Rub_v1_Gauss750",#
   #"Species_Acer_Spi_v1",#
   #"Species_Acer_Spi_v1_Gauss250",#
   "Species_Acer_Spi_v1_Gauss750",#
-  #"Species_Betu_All_v1",#
+  "Species_Betu_All_v1",#
   #"Species_Betu_All_v1_Gauss250",#
-  "Species_Betu_All_v1_Gauss750",#
+  #"Species_Betu_All_v1_Gauss750",#
   #"Species_Betu_Pap_v1",#
   #"Species_Betu_Pap_v1_Gauss250",#
   "Species_Betu_Pap_v1_Gauss750",#
-  "Species_Fagu_Gra_v1",#
-  #"Species_Fagu_Gra_v1_Gauss250",#
+  #"Species_Fagu_Gra_v1",#
+  "Species_Fagu_Gra_v1_Gauss250",#
   #"Species_Fagu_Gra_v1_Gauss750",#
   #"Species_Frax_Ame_v1",#
   #"Species_Frax_Ame_v1_Gauss250",#
   "Species_Frax_Ame_v1_Gauss750",#
   #"Species_Lari_Lar_v1",#
-  #"Species_Lari_Lar_v1_Gauss250",#
-  "Species_Lari_Lar_v1_Gauss750",#
+  "Species_Lari_Lar_v1_Gauss250",#
+  #"Species_Lari_Lar_v1_Gauss750",#
   "Species_Pice_Gla_v1",#
   #"Species_Pice_Gla_v1_Gauss250",#
   #"Species_Pice_Gla_v1_Gauss750",#
@@ -480,11 +397,11 @@ pred.variables2<-c(
   #"Structure_Biomass_TotalLiveAboveGround_v1",
   "Structure_Biomass_TotalLiveAboveGround_v1_Gauss250",
   #"Structure_Biomass_TotalLiveAboveGround_v1_Gauss750",
-  #"Structure_Stand_Age_v1",
-  "Structure_Stand_Age_v1_Gauss250",
+  "Structure_Stand_Age_v1",
+  #"Structure_Stand_Age_v1_Gauss250",
   #"Structure_Stand_Age_v1_Gauss750",
-  "wtbl250",
-  #"wtbl250_modal3x3",
+  #"wtbl250",
+  "wtbl250_modal3x3",
   #"wtbl250_modal5x5",
   #"CTI250",
   "CTI250_Gauss250",
@@ -496,19 +413,12 @@ pred.variables2<-c(
   #"urbagNNS_Gauss250",
   "urbagNNS_Gauss750",
   #"watNNS",
-  "watNNS_Gauss250",
-  #"watNNS_Gauss750",
-  "AHM",
-  "DD_0",
-  "MAT",
-  "MAP",
-  "DD5",
-  "MWMT",
-  "MCMT"
+  "watNNS_Gauss250"
+  #,"watNNS_Gauss750"
 )
 
 # create object storing the indices of predictor layers (from the prediction dataset) for the autocorrelation assessment that will inform block size. Only include continuous numeric variables here. Can use indexing "[-c(x:y)] to exclude them (e.g. exclude climate variables, HF, etc).
-ind2 <- which(names(pred_abs_2011) %in% pred.variables2[-c(21,26:32)])
+ind2 <- which(names(pred_abs_2011) %in% pred.variables2[-21])
 
 # Calculate autocorrelation range
 start_time <- Sys.time()
@@ -612,20 +522,14 @@ pred.variables3<-c(
   "urbagNNS",
   #"urbagNNS_Gauss250",
   #"urbagNNS_Gauss750",
-  "watNNS",
+  "watNNS"
+  #,
   #"watNNS_Gauss250",
-  #"watNNS_Gauss750",
-  "AHM",
-  "DD_0",
-  "MAT",
-  "MAP",
-  "DD5",
-  "MWMT",
-  "MCMT"
+  #"watNNS_Gauss750"
 )
 
 # create object storing the indices of predictor layers (from the prediction dataset) for the autocorrelation assessment that will inform block size. Only include continuous numeric variables here. Can use indexing "[-c(x:y)] to exclude them (e.g. exclude climate variables, HF, etc).
-ind3 <- which(names(pred_abs_2011) %in% pred.variables3[-c(21,26:32)])
+ind3 <- which(names(pred_abs_2011) %in% pred.variables3[-21])
 
 # Calculate autocorrelation range
 start_time <- Sys.time()
@@ -728,19 +632,13 @@ pred.variables4<-c(
   "urbagNNS_Gauss250",
   #"urbagNNS_Gauss750",
   #"watNNS",
-  "watNNS_Gauss250",
-  #"watNNS_Gauss750",
-  "AHM",
-  "DD_0",
-  "MAT",
-  "MAP",
-  "DD5",
-  "MWMT",
-  "MCMT"
+  "watNNS_Gauss250"
+  #,
+  #"watNNS_Gauss750"
 )
 
 # create object storing the indices of predictor layers (from the prediction dataset) for the autocorrelation assessment that will inform block size. Only include continuous numeric variables here. Can use indexing "[-c(x:y)] to exclude them (e.g. exclude climate variables, HF, etc).
-ind4 <- which(names(pred_abs_2011) %in% pred.variables4[-c(21,26:32)])
+ind4 <- which(names(pred_abs_2011) %in% pred.variables4[-21])
 
 # Calculate autocorrelation range
 start_time <- Sys.time()
@@ -843,18 +741,11 @@ pred.variables5<-c(
   "urbagNNS_Gauss750",
   #"watNNS",
   #"watNNS_Gauss250",
-  "watNNS_Gauss750",
-  "AHM",
-  "DD_0",
-  "MAT",
-  "MAP",
-  "DD5",
-  "MWMT",
-  "MCMT"
+  "watNNS_Gauss750"
 )
 
 # create object storing the indices of predictor layers (from the prediction dataset) for the autocorrelation assessment that will inform block size. Only include continuous numeric variables here. Can use indexing "[-c(x:y)] to exclude them (e.g. exclude climate variables, HF, etc).
-ind5 <- which(names(pred_abs_2011) %in% pred.variables5[-c(21,26:32)])
+ind5 <- which(names(pred_abs_2011) %in% pred.variables5[-21])
 
 # Calculate autocorrelation range
 start_time <- Sys.time()
@@ -883,7 +774,7 @@ brt5<- brt_blocks(data=datcombo,pred.variables = pred.variables5, lr=0.01,tc=3, 
 end_time<-Sys.time()
 end_time-start_time
 
-
+save.image("D:/CHID regional NS BRT/BRT_outputs/outputs.RData")
 
 # Comparison of the different models ####
 library(ggplot2)
@@ -997,40 +888,205 @@ dev_plot(brt4)
 
 
 # Population size from density predictions ####
-rast1 <-  predict(pred_abs_2011,
-          brt1,
+#pred_abs_2011<- brick("D:/CHID regional NS BRT/prediction dataset/abs2011_250m.grd")
+
+library(gbm)
+
+rast <-  predict(pred_abs_2011,
+          brt5,
           type = "response",
-          n.trees = brt1$n.trees)
-plot(rast1)
+          n.trees = brt5$n.trees)
+plot(rast)
 
-preds_brt1<-getValues(rast1)[!is.na(getValues(rast1))]
+preds_brt5<-getValues(rast)[!is.na(getValues(rast))]
 
-density_brt1_250m<-preds_brt1*6.25
+density_brt5_250m<-preds_brt5*6.25
 
-abundance_brt1<-matrix(NA,length(density_brt1_250m),100)
+abundance_brt5<-matrix(NA,length(density_brt5_250m),100)
 
-for(i in 1:length(density_brt1_250m)){
-    abundance_brt1[i,]<- rpois(100,density_brt1_250m[i])
+for(i in 1:length(density_brt5_250m)){
+    abundance_brt5[i,]<- rpois(100,density_brt5_250m[i])
 }
 
 
-mean(colSums(abundance_brt1))
-sd(colSums(abundance_brt1))
+mean(colSums(abundance_brt5))
 
-sum(density_brt1_250m) 
+mean(colSums(abundance_brt5))*2
 
-sum(getValues(rast1), na.rm= TRUE)
+sd(colSums(abundance_brt5))
 
-rpois(100,0.04)
+sum(density_brt5_250m) 
+
+sum(getValues(rast), na.rm= TRUE)
 
 
+upper<-raster("D://CHID regional NS BRT/BRT_outputs/GFsigma750m/confint/ confint_upper.tif")
+upper_brt5<-getValues(upper)[!is.na(getValues(upper))]
+upper_brt5_250m<-upper_brt5*6.25
+abundance_upper_brt5<-matrix(NA,length(upper_brt5_250m),100)
+for(i in 1:length(upper_brt5_250m)){
+  abundance_upper_brt5[i,]<- rpois(100,upper_brt5_250m[i])
+}
+mean(colSums(abundance_upper_brt5))
+mean(colSums(abundance_upper_brt5))*2
 
-# Assessing sampling representativeness 
+lower<-raster("D://CHID regional NS BRT/BRT_outputs/GFsigma750m/confint/ confint_lower.tif")
+lower_brt5<-getValues(lower)[!is.na(getValues(lower))]
+lower_brt5_250m<-lower_brt5*6.25
+abundance_lower_brt5<-matrix(NA,length(lower_brt5_250m),100)
+for(i in 1:length(lower_brt5_250m)){
+  abundance_lower_brt5[i,]<- rpois(100,lower_brt5_250m[i])
+}
+mean(colSums(abundance_lower_brt5))
+mean(colSums(abundance_lower_brt5))*2
+
+####
+# A function to obtain confidence intervals of model predictions ####
+boot_brt<-function(data,brtmodel,blocks,pred.data,nsamples=100,output.folder){
+  rast <-  predict(pred.data,
+                   brtmodel,
+                   type = "response",
+                   n.trees = brtmodel$n.trees)
+  stack<-stack(rast)
+  names(stack)[1]<-"model estimate"
+  
+  z <- output.folder
+  
+  if (file.exists(z) == FALSE) {
+    dir.create(z)
+  }
+  
+  for(i in 1:nsamples){
+    
+    
+    cat("loop",i,"\n") # this prints the loop number on console to track function progress
+    
+    
+    sample<-sample(1:nrow(data),size=nrow(data),replace=T)
+    data2<-data[sample,]
+    x1<- try(brt <-
+               gbm.step(
+                 data = data2,
+                 gbm.y = brtmodel$gbm.call$gbm.y,
+                 gbm.x = brtmodel$gbm.call$gbm.x,
+                 fold.vector = blocks$foldID[sample],
+                 n.folds = brtmodel$gbm.call$cv.folds,
+                 family = brtmodel$gbm.call$family,
+                 tree.complexity = brtmodel$gbm.call$tree.complexity,
+                 learning.rate = brtmodel$gbm.call$learning.rate,
+                 bag.fraction = brtmodel$gbm.call$bag.fraction,
+                 offset = brtmodel$gbm.call$offset[sample],
+                 site.weights = data2$wt
+               ))
+    
+    if(class(x1)=="NULL"){
+      sample<-sample(1:nrow(data),size=nrow(data),replace=T)
+      x1<- try(brt <-
+                 gbm.step(
+                   data = data2,
+                   gbm.y = brtmodel$gbm.call$gbm.y,
+                   gbm.x = brtmodel$gbm.call$gbm.x,
+                   fold.vector = blocks$foldID[sample],
+                   n.folds = brtmodel$gbm.call$cv.folds,
+                   family = brtmodel$gbm.call$family,
+                   tree.complexity = brtmodel$gbm.call$tree.complexity,
+                   learning.rate = brtmodel$gbm.call$learning.rate,
+                   bag.fraction = brtmodel$gbm.call$bag.fraction,
+                   offset = brtmodel$gbm.call$offset[sample],
+                   site.weights = data2$wt
+                 ))
+    }
+    
+    if(class(x1)=="NULL"){
+      sample<-sample(1:nrow(data),size=nrow(data),replace=T)
+      x1<- try(brt <-
+                 gbm.step(
+                   data = data2,
+                   gbm.y = brtmodel$gbm.call$gbm.y,
+                   gbm.x = brtmodel$gbm.call$gbm.x,
+                   fold.vector = blocks$foldID[sample],
+                   n.folds = brtmodel$gbm.call$cv.folds,
+                   family = brtmodel$gbm.call$family,
+                   tree.complexity = brtmodel$gbm.call$tree.complexity,
+                   learning.rate = brtmodel$gbm.call$learning.rate,
+                   bag.fraction = brtmodel$gbm.call$bag.fraction,
+                   offset = brtmodel$gbm.call$offset[sample],
+                   site.weights = data2$wt
+                 ))
+    }
+    
+    if(brt$n.trees>9999){
+      sample<-sample(1:nrow(data),size=nrow(data),replace=T)
+      x1<- try(brt <-
+                 gbm.step(
+                   data = data2,
+                   gbm.y = brtmodel$gbm.call$gbm.y,
+                   gbm.x = brtmodel$gbm.call$gbm.x,
+                   fold.vector = blocks$foldID[sample],
+                   n.folds = brtmodel$gbm.call$cv.folds,
+                   family = brtmodel$gbm.call$family,
+                   tree.complexity = brtmodel$gbm.call$tree.complexity,
+                   learning.rate = brtmodel$gbm.call$learning.rate,
+                   bag.fraction = brtmodel$gbm.call$bag.fraction,
+                   offset = brtmodel$gbm.call$offset[sample],
+                   site.weights = data2$wt
+                 ))
+    }
+    
+    
+    rast <- predict(pred.data,
+                    brt,
+                    type = "response",
+                    n.trees = brt$n.trees)
+    
+    
+    
+    stack <- addLayer(stack, rast)
+    names(stack)[i+1]<-paste0("sample",i) 
+    
+    writeRaster(stack, filename=paste0(z, "samples.grd"), format="raster",overwrite=TRUE)
+    
+    
+    
+  }
+  
+  fun0.05 <- function(x) {quantile(x, probs = 0.05, na.rm = TRUE)}
+  lower<- calc(stack[[-1]],fun0.05)
+  fun0.95 <- function(x) {quantile(x, probs = 0.95, na.rm = TRUE)}
+  upper<- calc(stack[[-1]],fun0.95)
+  
+  writeRaster(lower, filename=paste0(z, " confint_lower.tif"), format="GTiff",overwrite=TRUE)
+  writeRaster(upper, filename=paste0(z, " confint_upper.tif"), format="GTiff",overwrite=TRUE)
+  
+  return(stack)
+}
+
+start_time <- Sys.time()
+confintbrt5<-boot_brt(datcombo,brt5,sp_block_GF750,pred_abs_2011,nsamples=250,output.folder = "D://CHID regional NS BRT/BRT_outputs/GFsigma750m/confint/")
+end_time <- Sys.time()
+end_time - start_time
+
+save.image("D:/CHID regional NS BRT/BRT_outputs/outputs.RData")
+
+names(confintbrt5)
+
+#### Residual trend ####
+# the first 7290 rows in datcombo are from 2005 and earlier period. the rest is from 2006 and later.
+datcombo$period<-"2005 and earlier"
+datcombo$period[7291:15059]<-"2006 and later"
+
+fit<-log(brt5$fitted)
+
+m <- glm(datcombo$ABUND ~ datcombo$period, family=poisson, offset=fit+datcombo$logoffset)
+trend <-  100*(exp(coef(m)[2])-1)
+
+
+# Assessing sampling representativeness ####
 # The method measures the similarity of any given point to a reference set ofpoints, with respect to the chosen predictor variables. It reports the closeness of the point to the distribution of reference points, gives negative values for dissimilar points and maps these values across the whole prediction region.
 
 
-brt4$var.names
-mess1<-mess(pred_abs_2011[[brt4$var.names]], extract(pred_abs_2011[[brt4$var.names]],cbind(datcombo$X,datcombo$Y)))
+
+mess1<-mess(pred_abs_2011[[brt5$var.names]], extract(pred_abs_2011[[brt5$var.names]],cbind(datcombo$X,datcombo$Y)))
 
 plot(mess1)
 
