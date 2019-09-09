@@ -154,7 +154,7 @@ brt_blocks <- function(data = datcombo, pred.stack = pred_abs_2011, seed = 1222,
       overwrite = TRUE
     )
     
-    data_sp <-SpatialPointsDataFrame(coords = data[, 34:35], data = data, proj4string = LCC)
+    data_sp <-SpatialPointsDataFrame(coords = data[,c("X","Y")], data = data, proj4string = LCC)
     png(paste(z, speclist[j], "_pred1km.png", sep = ""))
     plot(rast, zlim = c(0, 1))
     points(data_sp$X, data_sp$Y, cex = 0.05)
@@ -180,7 +180,7 @@ load("D:/CHID regional NS BRT/NS_BRT_Rproject/data_pack.RData")
 
 j<-which(speclist=="CAWA") 
 
-specoff <- filter(offl, SPECIES==as.character(speclist[j]))
+specoff <- filter(offcombo, SPECIES==as.character(speclist[j]))
 specoff <- distinct(specoff)
 
 specdat2001 <- filter(NSPC2001, SPECIES == as.character(speclist[j]))
@@ -221,7 +221,7 @@ datcombo$OCCU <- 0
 datcombo$OCCU[which(datcombo$ABUND > 0)] <- 1
 
 # convert data into SpatialPointDataFrame class
-datcombo_sp <-SpatialPointsDataFrame(coords = datcombo[, 34:35], data = datcombo, proj4string = LCC)
+datcombo_sp <-SpatialPointsDataFrame(coords = datcombo[,c("X","Y")], data = datcombo, proj4string = LCC)
 
 
 # Full model ####
@@ -301,7 +301,8 @@ pred.variables<-c(
   "urbagNNS_Gauss750",
   "watNNS",
   "watNNS_Gauss250",
-  "watNNS_Gauss750"
+  "watNNS_Gauss750",
+  "ARU"
 )
   
   # create object storing the indices of predictor layers (from the prediction dataset) for the autocorrelation assessment that will inform block size. Only include continuous numeric variables here. Can use indexing "[-c(x:y)] to exclude them (e.g. exclude climate variables, HF, etc).
@@ -330,7 +331,7 @@ end_time <- Sys.time()
 end_time - start_time
 
 start_time<-Sys.time()
-brt1<- brt_blocks(data=datcombo,pred.variables = pred.variables, lr=0.01,tc=3, output.folder = "D://CHID regional NS BRT/BRT_outputs/full_model/", blocks=sp_block_full, save.points.shp = TRUE)  
+brt1<- brt_blocks(data=datcombo,pred.variables = pred.variables, lr=0.01,tc=3, output.folder = "D://CHID regional NS BRT/BRT_outputs/full_model_new/", blocks=sp_block_full, save.points.shp = TRUE)  
 end_time<-Sys.time()
 end_time-start_time
 
@@ -365,8 +366,8 @@ pred.variables2<-c(
   #"Species_Frax_Ame_v1_Gauss250",#
   "Species_Frax_Ame_v1_Gauss750",#
   #"Species_Lari_Lar_v1",#
-  "Species_Lari_Lar_v1_Gauss250",#
-  #"Species_Lari_Lar_v1_Gauss750",#
+  #"Species_Lari_Lar_v1_Gauss250",#
+  "Species_Lari_Lar_v1_Gauss750",#
   "Species_Pice_Gla_v1",#
   #"Species_Pice_Gla_v1_Gauss250",#
   #"Species_Pice_Gla_v1_Gauss750",#
@@ -397,8 +398,8 @@ pred.variables2<-c(
   #"Structure_Biomass_TotalLiveAboveGround_v1",
   "Structure_Biomass_TotalLiveAboveGround_v1_Gauss250",
   #"Structure_Biomass_TotalLiveAboveGround_v1_Gauss750",
-  "Structure_Stand_Age_v1",
-  #"Structure_Stand_Age_v1_Gauss250",
+  #"Structure_Stand_Age_v1",
+  "Structure_Stand_Age_v1_Gauss250",
   #"Structure_Stand_Age_v1_Gauss750",
   #"wtbl250",
   "wtbl250_modal3x3",
@@ -413,8 +414,9 @@ pred.variables2<-c(
   #"urbagNNS_Gauss250",
   "urbagNNS_Gauss750",
   #"watNNS",
-  "watNNS_Gauss250"
-  #,"watNNS_Gauss750"
+  "watNNS_Gauss250",
+  #,"watNNS_Gauss750",
+  "ARU"
 )
 
 # create object storing the indices of predictor layers (from the prediction dataset) for the autocorrelation assessment that will inform block size. Only include continuous numeric variables here. Can use indexing "[-c(x:y)] to exclude them (e.g. exclude climate variables, HF, etc).
@@ -443,7 +445,7 @@ end_time <- Sys.time()
 end_time - start_time
 
 start_time<-Sys.time()
-brt2<- brt_blocks(data=datcombo,pred.variables = pred.variables2, lr=0.01,tc=3, output.folder = "D://CHID regional NS BRT/BRT_outputs/selected_scales/", blocks=sp_block_select, save.points.shp = TRUE)  
+brt2<- brt_blocks(data=datcombo,pred.variables = pred.variables2, lr=0.01,tc=3, output.folder = "D://CHID regional NS BRT/BRT_outputs/selected_scales_new/", blocks=sp_block_select, save.points.shp = TRUE)  
 end_time<-Sys.time()
 end_time-start_time
 
@@ -522,10 +524,10 @@ pred.variables3<-c(
   "urbagNNS",
   #"urbagNNS_Gauss250",
   #"urbagNNS_Gauss750",
-  "watNNS"
-  #,
+  "watNNS",
   #"watNNS_Gauss250",
-  #"watNNS_Gauss750"
+  #"watNNS_Gauss750",
+  "ARU"
 )
 
 # create object storing the indices of predictor layers (from the prediction dataset) for the autocorrelation assessment that will inform block size. Only include continuous numeric variables here. Can use indexing "[-c(x:y)] to exclude them (e.g. exclude climate variables, HF, etc).
@@ -554,7 +556,7 @@ end_time <- Sys.time()
 end_time - start_time
 
 start_time<-Sys.time()
-brt3<- brt_blocks(data=datcombo,pred.variables = pred.variables3, lr=0.00001,tc=2, output.folder = "D://CHID regional NS BRT/BRT_outputs/cell_level/", blocks=sp_block_cell, save.points.shp = FALSE)  
+brt3<- brt_blocks(data=datcombo,pred.variables = pred.variables3, lr=0.00001,tc=2, output.folder = "D://CHID regional NS BRT/BRT_outputs/cell_level_new/", blocks=sp_block_cell, save.points.shp = FALSE)  
 end_time<-Sys.time()
 end_time-start_time
 
@@ -632,9 +634,9 @@ pred.variables4<-c(
   "urbagNNS_Gauss250",
   #"urbagNNS_Gauss750",
   #"watNNS",
-  "watNNS_Gauss250"
-  #,
-  #"watNNS_Gauss750"
+  "watNNS_Gauss250",
+  #"watNNS_Gauss750",
+  "ARU"
 )
 
 # create object storing the indices of predictor layers (from the prediction dataset) for the autocorrelation assessment that will inform block size. Only include continuous numeric variables here. Can use indexing "[-c(x:y)] to exclude them (e.g. exclude climate variables, HF, etc).
@@ -663,7 +665,7 @@ end_time <- Sys.time()
 end_time - start_time
 
 start_time<-Sys.time()
-brt4<- brt_blocks(data=datcombo,pred.variables = pred.variables4, lr=0.01,tc=3, output.folder = "D://CHID regional NS BRT/BRT_outputs/GFsigma250m/", blocks=sp_block_GF250, save.points.shp = TRUE)  
+brt4<- brt_blocks(data=datcombo,pred.variables = pred.variables4, lr=0.01,tc=3, output.folder = "D://CHID regional NS BRT/BRT_outputs/GFsigma250m_new/", blocks=sp_block_GF250, save.points.shp = TRUE)  
 end_time<-Sys.time()
 end_time-start_time
 
@@ -741,7 +743,8 @@ pred.variables5<-c(
   "urbagNNS_Gauss750",
   #"watNNS",
   #"watNNS_Gauss250",
-  "watNNS_Gauss750"
+  "watNNS_Gauss750",
+  "ARU"
 )
 
 # create object storing the indices of predictor layers (from the prediction dataset) for the autocorrelation assessment that will inform block size. Only include continuous numeric variables here. Can use indexing "[-c(x:y)] to exclude them (e.g. exclude climate variables, HF, etc).
@@ -770,7 +773,7 @@ end_time <- Sys.time()
 end_time - start_time
 
 start_time<-Sys.time()
-brt5<- brt_blocks(data=datcombo,pred.variables = pred.variables5, lr=0.01,tc=3, output.folder = "D://CHID regional NS BRT/BRT_outputs/GFsigma750m/", blocks=sp_block_GF750, save.points.shp = TRUE)  
+brt5<- brt_blocks(data=datcombo,pred.variables = pred.variables5, lr=0.01,tc=3, output.folder = "D://CHID regional NS BRT/BRT_outputs/GFsigma750m_new/", blocks=sp_block_GF750, save.points.shp = TRUE)  
 end_time<-Sys.time()
 end_time-start_time
 
@@ -886,59 +889,6 @@ dev_plot<-function(brt){
 
 dev_plot(brt4)
 
-
-# Population size from density predictions ####
-#pred_abs_2011<- brick("D:/CHID regional NS BRT/prediction dataset/abs2011_250m.grd")
-
-library(gbm)
-
-rast <-  predict(pred_abs_2011,
-          brt5,
-          type = "response",
-          n.trees = brt5$n.trees)
-plot(rast)
-
-preds_brt5<-getValues(rast)[!is.na(getValues(rast))]
-
-density_brt5_250m<-preds_brt5*6.25
-
-abundance_brt5<-matrix(NA,length(density_brt5_250m),100)
-
-for(i in 1:length(density_brt5_250m)){
-    abundance_brt5[i,]<- rpois(100,density_brt5_250m[i])
-}
-
-
-mean(colSums(abundance_brt5))
-
-mean(colSums(abundance_brt5))*2
-
-sd(colSums(abundance_brt5))
-
-sum(density_brt5_250m) 
-
-sum(getValues(rast), na.rm= TRUE)
-
-
-upper<-raster("D://CHID regional NS BRT/BRT_outputs/GFsigma750m/confint/ confint_upper.tif")
-upper_brt5<-getValues(upper)[!is.na(getValues(upper))]
-upper_brt5_250m<-upper_brt5*6.25
-abundance_upper_brt5<-matrix(NA,length(upper_brt5_250m),100)
-for(i in 1:length(upper_brt5_250m)){
-  abundance_upper_brt5[i,]<- rpois(100,upper_brt5_250m[i])
-}
-mean(colSums(abundance_upper_brt5))
-mean(colSums(abundance_upper_brt5))*2
-
-lower<-raster("D://CHID regional NS BRT/BRT_outputs/GFsigma750m/confint/ confint_lower.tif")
-lower_brt5<-getValues(lower)[!is.na(getValues(lower))]
-lower_brt5_250m<-lower_brt5*6.25
-abundance_lower_brt5<-matrix(NA,length(lower_brt5_250m),100)
-for(i in 1:length(lower_brt5_250m)){
-  abundance_lower_brt5[i,]<- rpois(100,lower_brt5_250m[i])
-}
-mean(colSums(abundance_lower_brt5))
-mean(colSums(abundance_lower_brt5))*2
 
 ####
 # A function to obtain confidence intervals of model predictions ####
@@ -1062,13 +1012,73 @@ boot_brt<-function(data,brtmodel,blocks,pred.data,nsamples=100,output.folder){
 }
 
 start_time <- Sys.time()
-confintbrt5<-boot_brt(datcombo,brt5,sp_block_GF750,pred_abs_2011,nsamples=250,output.folder = "D://CHID regional NS BRT/BRT_outputs/GFsigma750m/confint/")
+confintbrt5<-boot_brt(datcombo,brt5,sp_block_GF750,pred_abs_2011,nsamples=250,output.folder = "D://CHID regional NS BRT/BRT_outputs/GFsigma750m_new/confint/")
 end_time <- Sys.time()
 end_time - start_time
 
 save.image("D:/CHID regional NS BRT/BRT_outputs/outputs.RData")
 
 names(confintbrt5)
+
+
+
+
+
+# Population size from density predictions ####
+#pred_abs_2011<- brick("D:/CHID regional NS BRT/prediction dataset/abs2011_250m.grd")
+
+library(gbm)
+
+rast <-  predict(pred_abs_2011,
+                 brt5,
+                 type = "response",
+                 n.trees = brt5$n.trees)
+plot(rast)
+
+preds_brt5<-getValues(rast)[!is.na(getValues(rast))]
+
+density_brt5_250m<-preds_brt5*6.25
+
+abundance_brt5<-matrix(NA,length(density_brt5_250m),100)
+
+for(i in 1:length(density_brt5_250m)){
+  abundance_brt5[i,]<- rpois(100,density_brt5_250m[i])
+}
+
+
+mean(colSums(abundance_brt5))
+
+mean(colSums(abundance_brt5))*2
+
+sd(colSums(abundance_brt5))
+
+sum(density_brt5_250m) 
+
+sum(getValues(rast), na.rm= TRUE)
+
+
+upper<-raster("D://CHID regional NS BRT/BRT_outputs/GFsigma750m_new/confint/confint_upper.tif")
+upper_brt5<-getValues(upper)[!is.na(getValues(upper))]
+upper_brt5_250m<-upper_brt5*6.25
+abundance_upper_brt5<-matrix(NA,length(upper_brt5_250m),100)
+for(i in 1:length(upper_brt5_250m)){
+  abundance_upper_brt5[i,]<- rpois(100,upper_brt5_250m[i])
+}
+mean(colSums(abundance_upper_brt5))
+mean(colSums(abundance_upper_brt5))*2
+
+lower<-raster("D://CHID regional NS BRT/BRT_outputs/GFsigma750m_new/confint/confint_lower.tif")
+lower_brt5<-getValues(lower)[!is.na(getValues(lower))]
+lower_brt5_250m<-lower_brt5*6.25
+abundance_lower_brt5<-matrix(NA,length(lower_brt5_250m),100)
+for(i in 1:length(lower_brt5_250m)){
+  abundance_lower_brt5[i,]<- rpois(100,lower_brt5_250m[i])
+}
+mean(colSums(abundance_lower_brt5))
+mean(colSums(abundance_lower_brt5))*2
+
+
+
 
 #### Residual trend ####
 # the first 7290 rows in datcombo are from 2005 and earlier period. the rest is from 2006 and later.
@@ -1079,7 +1089,6 @@ fit<-log(brt5$fitted)
 
 m <- glm(datcombo$ABUND ~ datcombo$period, family=poisson, offset=fit+datcombo$logoffset)
 trend <-  100*(exp(coef(m)[2])-1)
-
 
 # Assessing sampling representativeness ####
 # The method measures the similarity of any given point to a reference set ofpoints, with respect to the chosen predictor variables. It reports the closeness of the point to the distribution of reference points, gives negative values for dissimilar points and maps these values across the whole prediction region.

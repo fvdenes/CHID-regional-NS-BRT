@@ -6,19 +6,19 @@ library(data.table)
 library(rgdal)
 library(dplyr)
 
-
-load("D:/Avian data processed/data_package_2016-04-18.Rdata")	
-load("D:/Avian data processed/offsets-v3_2016-04-18.Rdata")
-LCC <- CRS("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs")
-coordinates(SS) <- c("X", "Y") 
-proj4string(SS) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
-SSLCC <- spTransform(SS, LCC)
-
-offl <- data.table(melt(OFF))
-names(offl) <- c("PKEY","SPECIES","logoffset")
-offl$SPECIES <- as.character(offl$SPECIES)
-offl$PKEY <-as.character(offl$PKEY)
-rm(OFF)
+load("D:/Avian data processed/BAM_data_package_August2019.RData")
+#load("D:/Avian data processed/data_package_2016-04-18.Rdata")	
+#load("D:/Avian data processed/offsets-v3_2016-04-18.Rdata")
+#LCC <- CRS("+proj=lcc +lat_1=49 +lat_2=77 +lat_0=0 +lon_0=-95 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs")
+# coordinates(SS) <- c("X", "Y") 
+# proj4string(SS) <- CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+# SSLCC <- spTransform(SScombo, LCC)
+# 
+# offl <- data.table(melt(OFF))
+# names(offl) <- c("PKEY","SPECIES","logoffset")
+# offl$SPECIES <- as.character(offl$SPECIES)
+# offl$PKEY <-as.character(offl$PKEY)
+# rm(OFF)
 
 #eco<-shapefile("D:/CHID regional NS BRT/NNS_eco.shp")
 #eco<-rasterize(eco,NNS)
@@ -29,12 +29,10 @@ proj4string(NNS)<-LCC
 
 NNS_shp<-readOGR("D:/CHID regional NS BRT/spatial",layer="northernNSmngtunit")
 NNS_shp<-spTransform(NNS_shp,LCC)
-NSSS <- crop(SSLCC,NNS_shp)
-NSSS <- as.data.frame(NSSS)
 plot(NNS)
 
 # Load Beaudoin layers (2011 and 2001), crop and mask for study region, save as rasters
-b2011 <- list.files("D:/Beaudoin/2011/Processed/sppBiomass_Canada",pattern="tif$")
+b2011 <- list.files("D:/Beaudoin/2011/",pattern="tif$")
 setwd("D:/Beaudoin/2011/")
 bs2011 <- stack(raster(b2011[1]))
 for (i in 2:length(b2011)) { bs2011 <- addLayer(bs2011, raster(b2011[i]))}
@@ -42,9 +40,9 @@ names(bs2011) <- gsub("NFI_MODIS250m_2011_kNN_","",names(bs2011))
 abs2011 <- crop(bs2011,NNS)
 abs2011<-mask(abs2011,NNS)
 writeRaster(abs2011, filename="D:/Beaudoin/2011/Processed/NNS/abs2011_250m.grd", format="raster",overwrite=TRUE)
+abs2011<-brick("D:/Beaudoin/2011/Processed/NNS/abs2011_250m.grd")
 
-
-b2001 <- list.files("D:/Beaudoin/2001/Processed/sppBiomass_Canada",pattern="tif$")
+b2001 <- list.files("D:/Beaudoin/2001/",pattern="tif$")
 setwd("D:/Beaudoin/2001/")
 bs2001 <- stack(raster(b2001[1]))
 for (i in 2:length(b2001)) { bs2001 <- addLayer(bs2001, raster(b2001[i]))}
@@ -52,6 +50,7 @@ names(bs2001) <- gsub("NFI_MODIS250m_2001_kNN_","",names(bs2001))
 abs2001 <- crop(bs2001,NNS)
 abs2001<-mask(abs2001,NNS)
 writeRaster(abs2001, filename="D:/Beaudoin/2001/Processed/NNS/abs2001_250m.grd", format="raster",overwrite=TRUE)
+abs2001<-brick("D:/Beaudoin/2001/Processed/NNS/abs2001_250m.grd")
 
 # obtain weighted sums of neighourhood cells using Gaussian filter with sigma=250, and 750m for Beaudoin and CTI layers, save outputs as rasters
 ## sigma = 250m
@@ -91,7 +90,7 @@ for(i in 2:nlayers(abs2001)){
 }
 abs2001_Gauss250<-brick(abs2001_Gauss250)
 writeRaster(abs2001_Gauss250, filename="D:/Beaudoin/2001/Processed/NNS/abs2001_250_Gauss250m.grd", format="raster",overwrite=TRUE)
-abs2001_Gauss250<-brick("D:/Beaudoin/2001/Processed/NNS/abs2001_250_Gauss250m.grd")
+#abs2001_Gauss250<-brick("D:/Beaudoin/2001/Processed/NNS/abs2001_250_Gauss250m.grd")
 
 ## sigma = 750m
 fw750<-focalWeight(x=abs2001,d=750,type="Gauss")
@@ -103,7 +102,7 @@ for(i in 2:nlayers(abs2001)){
 }
 abs2001_Gauss750<-brick(abs2001_Gauss750)
 writeRaster(abs2001_Gauss750, filename="D:/Beaudoin/2001/Processed/NNS/abs2001_250_Gauss750m.grd", format="raster",overwrite=TRUE)
-abs2001_Gauss750<-brick("D:/Beaudoin/2001/Processed/NNS/abs2001_250_Gauss750m.grd")
+#abs2001_Gauss750<-brick("D:/Beaudoin/2001/Processed/NNS/abs2001_250_Gauss750m.grd")
 
 
 # water table data. Water table data is a factor, so no sense in applying the Gaussian filter smoother. Instead, obtain the modal value over equal weight matrices of size 3x3 (250m GF analog) and 5x5 (750m GF analog) 
@@ -112,8 +111,8 @@ wtbl250_modal3x3<-focal(wtbl250,w=matrix(1,3,3),na.rm=TRUE, fun=modal)
 wtbl250_modal5x5<-focal(wtbl250,w=matrix(1,5,5),na.rm=TRUE, fun=modal)
 
 
-writeRaster(wtbl250_Gauss250, filename="D:/CHID regional NS BRT/spatial/wtbl250_modal3x3.asc", format="ascii",overwrite=TRUE)
-writeRaster(wtbl250_Gauss750, filename="D:/CHID regional NS BRT/spatial/wtbl250_modal5x5.asc", format="ascii",overwrite=TRUE)
+writeRaster(wtbl250_modal3x3, filename="D:/CHID regional NS BRT/spatial/wtbl250_modal3x3.asc", format="ascii",overwrite=TRUE)
+writeRaster(wtbl250_modal5x5, filename="D:/CHID regional NS BRT/spatial/wtbl250_modal5x5.asc", format="ascii",overwrite=TRUE)
 
 # CTI data
 CTI<-raster("D:/CTI/CTI_NS.tif")
@@ -126,8 +125,11 @@ CTI250_Gauss250<-focal(CTI250,w=fw250,na.rm=TRUE)
 CTI250_Gauss750<-focal(CTI250,w=fw750,na.rm=TRUE)
 
 writeRaster(CTI250, filename="D:/CHID regional NS BRT/spatial/CTI250.asc", format="ascii",overwrite=TRUE)
+CTI250<-raster("D:/CHID regional NS BRT/spatial/CTI250.asc")
 writeRaster(CTI250_Gauss250, filename="D:/CHID regional NS BRT/spatial/CTI250_Gauss250.asc", format="ascii",overwrite=TRUE)
+CTI250_Gauss250<-raster("D:/CHID regional NS BRT/spatial/CTI250_Gauss250.asc")
 writeRaster(CTI250_Gauss750, filename="D:/CHID regional NS BRT/spatial/CTI250_Gauss750.asc", format="ascii",overwrite=TRUE)
+CTI250_Gauss750<-raster("D:/CHID regional NS BRT/spatial/CTI250_Gauss750.asc")
 
 # roads
 roadsNNS<-raster("D:/CHID regional NS BRT/spatial/roadsNNS.tif")
@@ -204,14 +206,24 @@ names(watNNS) <- "watNNS"
 names(watNNS_Gauss250) <- "watNNS_Gauss250"
 names(watNNS_Gauss750) <- "watNNS_Gauss750"
 
-pred_abs_2011<-stack(abs2011,abs2011_Gauss250,abs2011_Gauss750,wtbl250,wtbl250_modal3x3,wtbl250_modal5x5,CTI250,CTI250_Gauss250,CTI250_Gauss750,roadsNNS,roadsNNS_Gauss250,roadsNNS_Gauss750,urbagNNS, urbagNNS_Gauss250, urbagNNS_Gauss750, watNNS, watNNS_Gauss250, watNNS_Gauss750, quick=TRUE)
+ARU<-raster(extent(pred_abs_2011),crs=LCC,resolution=res(pred_abs_2011),vals=0)
+names(ARU)<-"ARU"
+
+pred_abs_2011<-stack(abs2011,abs2011_Gauss250,abs2011_Gauss750,wtbl250,wtbl250_modal3x3,wtbl250_modal5x5,CTI250,CTI250_Gauss250,CTI250_Gauss750,roadsNNS,roadsNNS_Gauss250,roadsNNS_Gauss750,urbagNNS, urbagNNS_Gauss250, urbagNNS_Gauss750, watNNS, watNNS_Gauss250, watNNS_Gauss750,ARU, quick=TRUE)
 names(pred_abs_2011)
 
 writeRaster(pred_abs_2011, filename="D:/CHID regional NS BRT/prediction dataset/abs2011_250m.grd", format="raster",overwrite=TRUE)
 
+pred_abs_2011<-stack("D:/CHID regional NS BRT/prediction dataset/abs2011_250m.grd")
 
 # Extracting data from rasters for surveyed locations (ABSS)
 ## 2011
+
+spSS<-SpatialPointsDataFrame(coords=SScombo[,2:3],data=SScombo,proj4string = LCC)
+NSSS <- crop(spSS,NNS_shp)
+NSSS <- NSSS@data
+NSSS
+
 dat2011 <- cbind(NSSS, extract(abs2011,as.matrix(cbind(NSSS$X,NSSS$Y)))) # includes Beaudoin layers (250m, no Gaussian filter) 
 
 for(i in 1:nlayers(abs2011_Gauss250)){
@@ -269,9 +281,6 @@ names(dat2011)[ncol(dat2011)] <- "watNNS_Gauss250"
 dat2011<-cbind(dat2011,extract(watNNS_Gauss750,as.matrix(cbind(dat2011$X,dat2011$Y)))) # includes wat 250m resolution data, Gaussian filter sigma=750m
 names(dat2011)[ncol(dat2011)] <- "watNNS_Gauss750"
 
-#dat2011 <-cbind(dat2011,extract(eco,as.matrix(cbind(dat2011$X,dat2011$Y)))) # includes ecoregions layer
-#names(dat2011)[ncol(dat2011)] <- "eco"
-
 
 ### set up weight matrix for SS, and calculate weight values for each row in dat2011
 r2 <- abs2011[[1]]
@@ -283,8 +292,8 @@ names(dat2011)[ncol(dat2011)] <- "sampsum25"
 dat2011$wt <- 1/dat2011$sampsum25
 
 dat2011$SS <- as.character(dat2011$SS)
-dat2011$PCODE <- as.character(dat2011$PCODE)
-dat2011<-dat2011[,-c(25:43)] # remove columns with climate data (from avian dataset)
+#dat2011$PCODE <- as.character(dat2011$PCODE)
+#dat2011<-dat2011[,-c(25:43)] # remove columns with climate data (from avian dataset)
 
 setwd("D:/CHID regional NS BRT/")
 write.csv(dat2011,"NNSdat2011.csv")
@@ -293,10 +302,6 @@ write.csv(dat2011,"NNSdat2011.csv")
 ## 2001
 dat2001 <- cbind(NSSS, extract(abs2001,as.matrix(cbind(NSSS$X,NSSS$Y)))) # includes Beaudoin layers (250m, no Gaussian filter)
 
-#for(i in which(names(abs2011)=="AHM"):which(names(abs2011)=="TD") ) { # copy climate data from dat2011
-#  dat2001<-cbind(dat2001,extract(abs2011[[i]],as.matrix(cbind(NSSS$X,NSSS$Y))))
-#  names(dat2001)[ncol(dat2001)] <- names(abs2011)[[i]]
-#}
 
 for(i in 1:nlayers(abs2001_Gauss250)){
   dat2001 <- cbind(dat2001, extract(abs2001_Gauss250[[i]],as.matrix(cbind(NSSS$X,NSSS$Y)))) # includes Beaudoin layers with Gaussian filter sigma=250m
@@ -353,8 +358,7 @@ names(dat2001)[ncol(dat2001)] <- "watNNS_Gauss250"
 dat2001<-cbind(dat2001,extract(watNNS_Gauss750,as.matrix(cbind(dat2001$X,dat2001$Y)))) # includes wat 250m resolution data, Gaussian filter sigma=750m
 names(dat2001)[ncol(dat2001)] <- "watNNS_Gauss750"
 
-#dat2001 <-cbind(dat2001,extract(eco,as.matrix(cbind(dat2001$X,dat2001$Y)))) # includes ecoregions layer
-#names(dat2001)[ncol(dat2001)] <- "eco"
+
 
 ### set up weight matrix for SS, and calculate weight values for each row in dat2001
 samprast2001 <- rasterize(cbind(dat2001$X,dat2001$Y), r2, field=1)
@@ -364,8 +368,8 @@ names(dat2001)[ncol(dat2001)] <- "sampsum25"
 dat2001$wt <- 1/dat2001$sampsum25
 
 dat2001$SS <- as.character(dat2001$SS)
-dat2001$PCODE <- as.character(dat2001$PCODE)
-dat2001<-dat2001[,-c(25:43)] # remove columns with climate data (from avian dataset, since using Adaptwest Climate data instead)
+# dat2001$PCODE <- as.character(dat2001$PCODE)
+# dat2001<-dat2001[,-c(25:43)] # remove columns with climate data (from avian dataset, since using Adaptwest Climate data instead)
 write.csv(dat2001,"NNSdat2001.csv")
 
 # Prepare point count data for each SS and aggregate for 2001 and 2011.
@@ -375,23 +379,25 @@ colnames(PC)[10]<-"PCODE"
 PC <- inner_join(PC,SS@data[,c(2,5)],by="SS")
 NSPC <- PC[PC$JURS=="NS",]
 
-
+PC<-inner_join(PCcombo,PKEYcombo,by=c("PKEY"))
+PC<-inner_join(PC,SScombo,by="SS")
+names(PC)
 
 NSPC <- PC[which(PC$SS%in%NSSS$SS),]
 
 NSPC$SS <- as.character(NSPC$SS)
 NSPC$PKEY <- as.character(NSPC$PKEY)
-NSPC$PCODE <- as.character(NSPC$PCODE)
+#NSPC$PCODE <- as.character(NSPC$PCODE)
 NSPC$SPECIES <- as.character(NSPC$SPECIES)
-NSPC2001 <- NSPC[NSPC$YEAR < 2006,] #n=83570
-NSPC2011 <- NSPC[NSPC$YEAR > 2005,] #n=91656
-survey2001 <- aggregate(NSPC2001$ABUND, by=list("PKEY"=NSPC2001$PKEY,"SS"=NSPC2001$SS,"PCODE"=NSPC2001$PCODE), FUN=sum) #n=9865
-survey2011 <- aggregate(NSPC2011$ABUND, by=list("PKEY"=NSPC2011$PKEY,"SS"=NSPC2011$SS,"PCODE"=NSPC2011$PCODE), FUN=sum) #n=10505
+NSPC2001 <- NSPC[NSPC$YEAR < 2006,] 
+NSPC2011 <- NSPC[NSPC$YEAR > 2005,] 
+survey2001 <- aggregate(NSPC2001$ABUND, by=list("PKEY"=NSPC2001$PKEY,"SS"=NSPC2001$SS,"ARU"=NSPC2001$ARU), FUN=sum) #n=9865
+survey2011 <- aggregate(NSPC2011$ABUND, by=list("PKEY"=NSPC2011$PKEY,"SS"=NSPC2011$SS,"ARU"=NSPC2011$ARU), FUN=sum) #n=10505
 
-speclist<-levels(as.factor(offl$SPECIES))
+speclist<-levels(as.factor(offcombo$SPECIES))
 
 
 
-rm(list=setdiff(ls(),c("pred_abs_2011","LCC","speclist","offl","NSPC2001","survey2001","dat2001","NSPC2011","survey2011","dat2011")))
+rm(list=setdiff(ls(),c("pred_abs_2011","LCC","speclist","offcombo","NSPC2001","survey2001","dat2001","NSPC2011","survey2011","dat2011")))
 gc()
 save.image("D:/CHID regional NS BRT/NS_BRT_Rproject/data_pack.RData")
