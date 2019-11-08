@@ -131,7 +131,7 @@ CTI250_Gauss250<-raster("D:/CHID regional NS BRT/spatial/CTI250_Gauss250.asc")
 writeRaster(CTI250_Gauss750, filename="D:/CHID regional NS BRT/spatial/CTI250_Gauss750.asc", format="ascii",overwrite=TRUE)
 CTI250_Gauss750<-raster("D:/CHID regional NS BRT/spatial/CTI250_Gauss750.asc")
 
-# roads
+# roads (Venter et al)
 roadsNNS<-raster("D:/CHID regional NS BRT/spatial/roadsNNS.tif")
 roadsNNS<-projectRaster(roadsNNS,wtbl250)
 roadsNNS<-crop(roadsNNS,NNS)
@@ -374,10 +374,10 @@ write.csv(dat2001,"NNSdat2001.csv")
 
 # Prepare point count data for each SS and aggregate for 2001 and 2011.
 
-PC <- inner_join(PCTBL,PKEY[,1:8],by=c("PKEY","SS"))[,-1]
-colnames(PC)[10]<-"PCODE"
-PC <- inner_join(PC,SS@data[,c(2,5)],by="SS")
-NSPC <- PC[PC$JURS=="NS",]
+# PC <- inner_join(PCTBL,PKEY[,1:8],by=c("PKEY","SS"))[,-1]
+# colnames(PC)[10]<-"PCODE"
+# PC <- inner_join(PC,SS@data[,c(2,5)],by="SS")
+# NSPC <- PC[PC$JURS=="NS",]
 
 PC<-inner_join(PCcombo,PKEYcombo,by=c("PKEY"))
 PC<-inner_join(PC,SScombo,by="SS")

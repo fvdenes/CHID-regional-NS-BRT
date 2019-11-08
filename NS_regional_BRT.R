@@ -7,6 +7,7 @@ library(dplyr)
 library(blockCV)
 library(sp)
 library(dismo)
+library(ggplot2)
 
 # A function that fits the BRT model ('gbm.step' from dismo package) on pre-defined folds, and saves outputs ####
 brt_blocks <- function(data = datcombo, pred.stack = pred_abs_2011, seed = 1222, pred.variables ,output.folder, blocks=NULL, keep.out = TRUE, tc=3,lr=0.001,bf=0.5, save.points.shp=FALSE){ 
@@ -627,6 +628,9 @@ pred.variables4<-c(
   #"wtbl250",
   "wtbl250_modal3x3",
   #"wtbl250_modal5x5",
+  "CTI250",
+  #"CTI250_Gauss250",
+  #"CTI250_Gauss750",
   #"roadsNNS",
   "roadsNNS_Gauss250",
   #"roadsNNS_Gauss750",
@@ -735,6 +739,9 @@ pred.variables5<-c(
   #"wtbl250",
   #"wtbl250_modal3x3",
   "wtbl250_modal5x5",
+  #"CTI250",
+  #"CTI250_Gauss250",
+  "CTI250_Gauss750",
   #"roadsNNS",
   #"roadsNNS_Gauss250",
   "roadsNNS_Gauss750",
@@ -911,77 +918,33 @@ boot_brt<-function(data,brtmodel,blocks,pred.data,nsamples=100,output.folder){
     
     cat("loop",i,"\n") # this prints the loop number on console to track function progress
     
-    
-    sample<-sample(1:nrow(data),size=nrow(data),replace=T)
-    data2<-data[sample,]
-    x1<- try(brt <-
-               gbm.step(
-                 data = data2,
-                 gbm.y = brtmodel$gbm.call$gbm.y,
-                 gbm.x = brtmodel$gbm.call$gbm.x,
-                 fold.vector = blocks$foldID[sample],
-                 n.folds = brtmodel$gbm.call$cv.folds,
-                 family = brtmodel$gbm.call$family,
-                 tree.complexity = brtmodel$gbm.call$tree.complexity,
-                 learning.rate = brtmodel$gbm.call$learning.rate,
-                 bag.fraction = brtmodel$gbm.call$bag.fraction,
-                 offset = brtmodel$gbm.call$offset[sample],
-                 site.weights = data2$wt
-               ))
-    
-    if(class(x1)=="NULL"){
+   
+    brt <- NULL
+    attempt <- 0
+    while( is.null(brt) && attempt <= 20 ) {
+      attempt <- attempt + 1
+      
       sample<-sample(1:nrow(data),size=nrow(data),replace=T)
-      x1<- try(brt <-
-                 gbm.step(
-                   data = data2,
-                   gbm.y = brtmodel$gbm.call$gbm.y,
-                   gbm.x = brtmodel$gbm.call$gbm.x,
-                   fold.vector = blocks$foldID[sample],
-                   n.folds = brtmodel$gbm.call$cv.folds,
-                   family = brtmodel$gbm.call$family,
-                   tree.complexity = brtmodel$gbm.call$tree.complexity,
-                   learning.rate = brtmodel$gbm.call$learning.rate,
-                   bag.fraction = brtmodel$gbm.call$bag.fraction,
-                   offset = brtmodel$gbm.call$offset[sample],
-                   site.weights = data2$wt
-                 ))
-    }
+      data2<-data[sample,]
+      
+      try(brt <-
+            gbm.step(
+              data = data2,
+              gbm.y = brtmodel$gbm.call$gbm.y,
+              gbm.x = brtmodel$gbm.call$gbm.x,
+              fold.vector = blocks$foldID[sample],
+              n.folds = brtmodel$gbm.call$cv.folds,
+              family = brtmodel$gbm.call$family,
+              tree.complexity = brtmodel$gbm.call$tree.complexity,
+              learning.rate = brtmodel$gbm.call$learning.rate,
+              bag.fraction = brtmodel$gbm.call$bag.fraction,
+              offset = brtmodel$gbm.call$offset[sample],
+              site.weights = data2$wt
+            ))
+    } 
     
-    if(class(x1)=="NULL"){
-      sample<-sample(1:nrow(data),size=nrow(data),replace=T)
-      x1<- try(brt <-
-                 gbm.step(
-                   data = data2,
-                   gbm.y = brtmodel$gbm.call$gbm.y,
-                   gbm.x = brtmodel$gbm.call$gbm.x,
-                   fold.vector = blocks$foldID[sample],
-                   n.folds = brtmodel$gbm.call$cv.folds,
-                   family = brtmodel$gbm.call$family,
-                   tree.complexity = brtmodel$gbm.call$tree.complexity,
-                   learning.rate = brtmodel$gbm.call$learning.rate,
-                   bag.fraction = brtmodel$gbm.call$bag.fraction,
-                   offset = brtmodel$gbm.call$offset[sample],
-                   site.weights = data2$wt
-                 ))
-    }
     
-    if(brt$n.trees>9999){
-      sample<-sample(1:nrow(data),size=nrow(data),replace=T)
-      x1<- try(brt <-
-                 gbm.step(
-                   data = data2,
-                   gbm.y = brtmodel$gbm.call$gbm.y,
-                   gbm.x = brtmodel$gbm.call$gbm.x,
-                   fold.vector = blocks$foldID[sample],
-                   n.folds = brtmodel$gbm.call$cv.folds,
-                   family = brtmodel$gbm.call$family,
-                   tree.complexity = brtmodel$gbm.call$tree.complexity,
-                   learning.rate = brtmodel$gbm.call$learning.rate,
-                   bag.fraction = brtmodel$gbm.call$bag.fraction,
-                   offset = brtmodel$gbm.call$offset[sample],
-                   site.weights = data2$wt
-                 ))
-    }
+
     
     
     rast <- predict(pred.data,
@@ -994,8 +957,8 @@ boot_brt<-function(data,brtmodel,blocks,pred.data,nsamples=100,output.folder){
     stack <- addLayer(stack, rast)
     names(stack)[i+1]<-paste0("sample",i) 
     
-    writeRaster(stack, filename=paste0(z, "samples.grd"), format="raster",overwrite=TRUE)
     
+    saveRDS(brt, file=paste0(z,"bootstrap_model",i,".R"))
     
     
   }
@@ -1005,8 +968,9 @@ boot_brt<-function(data,brtmodel,blocks,pred.data,nsamples=100,output.folder){
   fun0.95 <- function(x) {quantile(x, probs = 0.95, na.rm = TRUE)}
   upper<- calc(stack[[-1]],fun0.95)
   
-  writeRaster(lower, filename=paste0(z, " confint_lower.tif"), format="GTiff",overwrite=TRUE)
-  writeRaster(upper, filename=paste0(z, " confint_upper.tif"), format="GTiff",overwrite=TRUE)
+  writeRaster(lower, filename=paste0(z, "confint_lower.tif"), format="GTiff",overwrite=TRUE)
+  writeRaster(upper, filename=paste0(z, "confint_upper.tif"), format="GTiff",overwrite=TRUE)
+  writeRaster(stack, filename=paste0(z, "samples.grd"), format="raster",overwrite=TRUE)
   
   return(stack)
 }
@@ -1016,7 +980,10 @@ confintbrt5<-boot_brt(datcombo,brt5,sp_block_GF750,pred_abs_2011,nsamples=250,ou
 end_time <- Sys.time()
 end_time - start_time
 
+
 save.image("D:/CHID regional NS BRT/BRT_outputs/outputs.RData")
+
+writeRaster(confintbrt5,file="D://CHID regional NS BRT/BRT_outputs/GFsigma750m_new/confint/samples.grd", format="raster",overwrite=T)
 
 names(confintbrt5)
 
@@ -1026,69 +993,979 @@ names(confintbrt5)
 
 # Population size from density predictions ####
 #pred_abs_2011<- brick("D:/CHID regional NS BRT/prediction dataset/abs2011_250m.grd")
+load("D:/CHID regional NS BRT/BRT_outputs/outputs.RData")
 
 library(gbm)
-
+start_time <- Sys.time()
 rast <-  predict(pred_abs_2011,
                  brt5,
                  type = "response",
                  n.trees = brt5$n.trees)
-plot(rast)
+end_time <- Sys.time()
+end_time - start_time
+plot(rast) # density is singing males/ha
 
-preds_brt5<-getValues(rast)[!is.na(getValues(rast))]
+# need to consider only the raster cells that went into the simulations
+load("D:/CHID regional NS BRT/Landscape simulation results/Prediction raster/birddensityRasters_NovaScotia_baseline_BudwormBaselineFire_1_CAWA.RData")
+plot(PredictBirdsp.l[[1]])
 
-density_brt5_250m<-preds_brt5*6.25
+rast2<-mask(rast,PredictBirdsp.l[[1]])
 
-abundance_brt5<-matrix(NA,length(density_brt5_250m),100)
+# Multiplying density values by 6.25 (hectars in a 250-250 pixel) to get abundance for each cell and overall population size
 
-for(i in 1:length(density_brt5_250m)){
-  abundance_brt5[i,]<- rpois(100,density_brt5_250m[i])
+density_brt5_250m<-rast2*6.25
+
+
+popsize<-cellStats(density_brt5_250m,stat=sum,na.rm=T) # THIS IS ESTIMATED POPULATION SIZE
+
+
+# alternative is to obtain 100 random Poisson draws using cell density as rate parameter:
+v1<-values(density_brt5_250m)[!is.na(values(density_brt5_250m))]
+abundance_brt5<-matrix(NA,length(v1),100)
+for(i in 1:nrow(abundance_brt5)){
+  abundance_brt5[i,]<- rpois(100,v1[i])
 }
+## mean of sums across the 100 draws
+mean(colSums(abundance_brt5)) 
 
 
-mean(colSums(abundance_brt5))
+# Same procedure for upper and lower CI predictions  
+upper<-raster("D:/CHID regional NS BRT/BRT_outputs/GFsigma750m_new/confint/confint_upper.tif") 
+upper2<-mask(upper,PredictBirdsp.l[[1]])
+upper_brt5_250m<-upper2*6.25
+popsize.upp<-cellStats(upper_brt5_250m,stat=sum,na.rm=T)
 
-mean(colSums(abundance_brt5))*2
-
-sd(colSums(abundance_brt5))
-
-sum(density_brt5_250m) 
-
-sum(getValues(rast), na.rm= TRUE)
-
-
-upper<-raster("D://CHID regional NS BRT/BRT_outputs/GFsigma750m_new/confint/confint_upper.tif")
-upper_brt5<-getValues(upper)[!is.na(getValues(upper))]
-upper_brt5_250m<-upper_brt5*6.25
-abundance_upper_brt5<-matrix(NA,length(upper_brt5_250m),100)
-for(i in 1:length(upper_brt5_250m)){
-  abundance_upper_brt5[i,]<- rpois(100,upper_brt5_250m[i])
-}
-mean(colSums(abundance_upper_brt5))
-mean(colSums(abundance_upper_brt5))*2
+# v2<-values(upper_brt5_250m)[!is.na(values(upper_brt5_250m))]
+# abundance_upper_brt5<-matrix(NA,length(v2),100)
+# for(i in 1:nrow(abundance_upper_brt5)){
+#   abundance_upper_brt5[i,]<- rpois(100,v2[i])
+# }
+# mean(colSums(abundance_upper_brt5))
 
 lower<-raster("D://CHID regional NS BRT/BRT_outputs/GFsigma750m_new/confint/confint_lower.tif")
-lower_brt5<-getValues(lower)[!is.na(getValues(lower))]
-lower_brt5_250m<-lower_brt5*6.25
-abundance_lower_brt5<-matrix(NA,length(lower_brt5_250m),100)
-for(i in 1:length(lower_brt5_250m)){
-  abundance_lower_brt5[i,]<- rpois(100,lower_brt5_250m[i])
+lower2<-mask(lower,PredictBirdsp.l[[1]])
+lower_brt5_250m<-lower2*6.25
+popsize.low<-cellStats(lower_brt5_250m,stat=sum,na.rm=T)
+
+# v3<-values(lower_brt5_250m)[!is.na(values(lower_brt5_250m))]
+# abundance_lower_brt5<-matrix(NA,length(v3),100)
+# for(i in 1:nrow(abundance_lower_brt5)){
+#   abundance_lower_brt5[i,]<- rpois(100,v3[i])
+# }
+# mean(colSums(abundance_lower_brt5))
+
+# to obtain custom CI (other than 90%):
+upper3<- calc(confintbrt5[[-1]],function(x) {quantile(x, probs = 0.95, na.rm = TRUE)})
+upper3<-mask(upper3,PredictBirdsp.l[[1]])
+upper3_250m<-upper3*6.25
+popsize.upp<-cellStats(upper3_250m,stat=sum,na.rm=T)
+
+lower3<- calc(confintbrt5[[-1]],function(x) {quantile(x, probs = 0.05, na.rm = TRUE)})
+lower3<-mask(lower3,PredictBirdsp.l[[1]])
+lower3_250m<-lower3*6.25
+popsize.low<-cellStats(lower3_250m,stat=sum,na.rm=T)
+
+
+
+# cell level SDs
+bootsamples<-confintbrt5[[-1]]
+names(bootsamples)
+bootsamples_masked<-mask(bootsamples,PredictBirdsp.l[[1]])
+SDpreds<-calc(bootsamples_masked,fun=sd,na.rm=T)
+
+
+# there are some outliers with very high SD. Set those values to be equal to the 99% quantile
+#values(SDpreds)[which(values(SDpreds)>quantile(values(SDpreds),0.9995,na.rm=T))]<-quantile(values(SDpreds),0.9995,na.rm=T)
+
+plot(SDpreds)
+
+popsizeCIs<-c(estimate=popsize,lower=popsize.low,upper=popsize.upp)
+
+# Current population size probability  ####
+
+bootpopsizes<-rep(NA,250)
+for(i in 1:250){
+  bootpopsizes[i]<-cellStats(bootsamples_masked[[i]]*6.25,stat=sum,na.rm=T)
 }
-mean(colSums(abundance_lower_brt5))
-mean(colSums(abundance_lower_brt5))*2
+
+
+bootpopsizes
+
+mean(bootpopsizes)
+median(bootpopsizes)
+sd(bootpopsizes)  
+###
+
+#with normal distribution:
+poprange<-seq(15000,70000,by=1000)
+id.dist<-pnorm(poprange,mean=mean(bootpopsizes),sd=sd(bootpopsizes),lower.tail = F)
+id.df<-data.frame("Pop.range"=poprange,"Probability"=id.dist,Distribution="normal")
+library(ggplot2)
+ggplot(id.df, aes(x = Pop.range, y = Probability)) + geom_point()+ geom_vline(xintercept = popsize,  color = "blue", size=0.8)
+
+#with gamma distribution:
+findGamma1<-function(scale.init,shape.init,low,upp){
+  mat<-expand.grid(scale=runif(1000,min=scale.init[1],max=scale.init[2]),shape=runif(1000,min=shape.init[1],max=shape.init[2]))
+  mat[,3:4]<-t(apply(mat,1,FUN = function(x){qgamma(p=c(0.05,0.95),shape=x[2],scale=x[1])}))
+  mat$distances<-pointDistance(p1=mat[,3:4],p2=c(low,upp),lonlat = F)
+  out1<-mat[which.min(mat$distances),]
+  
+  scale.init2<-unlist(c(out1[1]-(out1[1]*0.25),out1[1]+(out1[1]*0.25)))
+  shape.init2<-unlist(c(out1[2]-(out1[2]*0.25),out1[2]+(out1[2]*0.25)))
+  
+  mat2<-expand.grid(scale=runif(1000,min=scale.init2[1],max=scale.init2[2]),shape=runif(1000,min=shape.init2[2],max=shape.init2[2]))
+  mat2[,3:4]<-t(apply(mat2,1,FUN = function(x){qgamma(p=c(0.05,0.95),shape=x[2],scale=x[1])}))
+  mat2$distances<-pointDistance(p1=mat2[,3:4],p2=c(low,upp),lonlat = F)
+  
+  mat3<-rbind(mat,mat2)
+  colnames(mat3)[3:4]<-c("lowerCL_0.5","upperCL_0.95")
+  return(mat3[which.min(mat3$distances),])
+}
+
+
+GammaParamsCurrent<-findGamma1(scale.init=c(2000,60000),shape.init = c(0.25,15),upp=popsize.upp,low=popsize.low)
+GammaParamsCurrent
+
+
+id.dist.gamma<-pgamma(poprange,shape=GammaParamsCurrent$shape,scale=GammaParamsCurrent$scale,lower.tail = F)
+id.df.gamma<-data.frame("Pop.range"=poprange,"Probability"=id.dist.gamma,Distribution="gamma")
+
+
+ycurrentprednormal<-pnorm(popsize,mean=mean(bootpopsizes),sd=sd(bootpopsizes),lower.tail = F)
+ycurrentpredgamma<-pgamma(popsize,shape=GammaParamsCurrent$shape,scale=GammaParamsCurrent$scale,lower.tail = F)
+
+
+library(ggplot2)
+ggplot(rbind(id.df,id.df.gamma)) + 
+  geom_point(aes(x = Pop.range, y = Probability,color=Distribution))+ 
+  geom_errorbarh(aes(xmax=popsize.upp,xmin=popsize.low,y=ycurrentpredgamma,height=0.03),color="#00BFC4")+
+  geom_point(x = popsize,y=ycurrentpredgamma)+
+  geom_errorbarh(aes(xmax=popsize.upp,xmin=popsize.low,y=ycurrentprednormal,height=0.03),color="#F8766D")+
+  geom_point(x = popsize,y=ycurrentprednormal)+  
+  labs(x="N",y="Probability population size >= N")+
+  annotate("text", x= 38000, y = 0.57,hjust=0, label = paste0("Model prediction (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")"),size=4)
+
+
+
+#### Future Population size - current conditions ####
+# trend from BBS (Smith et al 2014), CAWA in Nova Scotia
+trends<- c(long_trend = -1.78, # long term trend (>40 years)
+                    long_trend_lower= -3.56,
+                    long_trend_upper= 0.124,
+                    short_trend = 5.46, # short term trend (10 years) 
+                    short_trend_lower =-3.31,
+                    short_trend_upper = 16)
+
+# Population growth model - also from Smith et al 2014
+
+popgrowth<-function(data){
+  years<-data[1]
+  N0<-data[2]
+  trend<-data[3]
+  lower<-data[4]
+  upper<-data[5]
+
+  est<-N0*(1+trend/100)^years
+  low<-N0*(1+lower/100)^years
+  upp<-N0*(1+upper/100)^years
+  out<-c(est=est,low=low,upp=upp)
+  out
+  }
+
+year.range<-23
+
+df<-data.frame(years=rep(seq(1:year.range),6),N0=rep(popsizeCIs,each=2*year.range),trend=c(rep(trends[1],year.range),rep(trends[4],year.range)),lower=c(rep(trends[2],year.range),rep(trends[5],year.range)),upper=c(rep(trends[3],year.range),rep(trends[6],year.range)))
+df[,6:8]<-t(apply(df,1,popgrowth))
+names(df)[6:8]<-c("Ni","Ni_lower", "Ni_upper")
+df$group<-c(rep("Estimate",2*year.range),rep("2.5%CI",2*year.range),rep("97.5%CI",2*year.range))
+df$group2<-rep(c(rep("long",year.range),rep("short",year.range)),3)  
+df
+
+df_long<-subset(df,group2=="long")
+row.names(df_long)<-seq(1:nrow(df_long))
+df_short<-subset(df,group2=="short")
+row.names(df_short)<-seq(1:nrow(df_short))
+
+ggplot(data=df_long)+
+  geom_ribbon(mapping=aes(x=years,ymin=Ni_lower,ymax=Ni_upper,fill=group), alpha=0.2)+
+  geom_line(mapping=aes(x=years,y=Ni,group=group,color=group),size=1)+ 
+  #theme(legend.title=element_blank())+ 
+  guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
+  labs(x = "Years", y="Population size", fill="Current population",color="Current population")+
+  xlim(1,year.range)+
+  ylim(0,100000)+
+  annotate("text", x= 5, y = 100000, label = ("Long term trend = -1.78 (-3.56, 0.174)"),size=5)
+
+ggplot(data=df_short)+
+  geom_ribbon(mapping=aes(x=years,ymin=Ni_lower,ymax=Ni_upper,fill=group), alpha=0.2)+
+  geom_line(mapping=aes(x=years,y=Ni,group=group,color=group),size=1)+ 
+  #theme(legend.title=element_blank())+ 
+  guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
+  labs(x = "Years", y="Population size", fill="Current population",color="Current population")+
+  #xlim(1,year.range)+
+  #ylim(0,100000)+
+  annotate("text", x= 5, y = 1000000, label = ("Short term trend = 5.46 (-3.31, 16)"),size=5)
+
+# # find out what year the current estimates most relate to, based on year of avian data:
+load("D:/Avian data processed/BAM_data_package_August2019.RData")
+yearsdata<-PKEYcombo$YEAR[match(datcombo$PKEY,PKEYcombo$PKEY)]
+yearsdata<-as.data.frame(t(table(yearsdata)))[,2:3]
+names(yearsdata)<-c("Year","Freq")
+yearsdata$Year<-as.numeric(as.character(yearsdata$Year))
+str(yearsdata)
+
+median(PKEYcombo$YEAR[match(datcombo$PKEY,PKEYcombo$PKEY)])
+mean(PKEYcombo$YEAR[match(datcombo$PKEY,PKEYcombo$PKEY)])
+plot(table(PKEYcombo$YEAR[match(datcombo$PKEY,PKEYcombo$PKEY)]),ylab="Frequency")
+
+# 2006 is median, but use 2007 to include in short term trend
+BBS_AI <- read.csv("D:/CHID regional NS BRT/BBS_annual_indices_CAWA_NS.csv")
+
+AI2007<-BBS_AI[which(BBS_AI$year==2007&BBS_AI$timeFrame=="Long-term"),7:9]
+
+df_long
+
+newdf<-data.frame(year=c(1970:2040),annualIndex=NA,lower=NA,upper=NA,psize=NA,psizeLow=NA,psizeUpp=NA)
+newdf[1:48,2:4]<-BBS_AI[1:48,7:9]
+
+for(i in c(1:48)){
+  newdf[i,5]<-newdf[i,2]*popsizeCIs[1]/newdf[38,2]
+  newdf[i,6]<-newdf[i,2]*popsizeCIs[2]/newdf[38,2]
+  newdf[i,7]<-newdf[i,2]*popsizeCIs[3]/newdf[38,2]
+}
+
+newdf
+
+for(i in 49:71){
+  newdf[i,5]<-newdf[48,5]*(1+trends[1]/100)^(i-48)
+  newdf[i,6]<-newdf[48,6]*(1+trends[1]/100)^(i-48)
+  newdf[i,7]<-newdf[48,7]*(1+trends[1]/100)^(i-48)
+
+  newdf[i,2]<-round(AI2007[1]*newdf[i,5]/newdf[38,5],3)
+  newdf[i,3]<-round(AI2007[1]*newdf[i,6]/newdf[38,5],3)
+  newdf[i,4]<-round(AI2007[1]*newdf[i,7]/newdf[38,5],3)
+
+
+}
+
+ggplot(data=newdf[1:71,])+
+  geom_ribbon(aes(x=year,ymin=upper,ymax=lower),alpha=0.3)+
+  geom_line(aes(x=year,y=annualIndex))+
+  geom_vline(xintercept = 2007,  color = "blue", size=0.5)+
+  geom_vline(xintercept = 2018,  color = "red", size=0.5)
+
+
+ggplot(data=newdf[1:71,])+
+  geom_ribbon(aes(x=year,ymin=psizeLow,ymax=psizeUpp),alpha=0.3)+
+  geom_line(aes(x=year,y=psize))+
+  geom_vline(xintercept = 2007,  color = "blue", size=0.5)+
+  geom_vline(xintercept = 2018,  color = "red", size=0.5)
+
+
+newdf[72:117,]<-NA
+
+newdf$group<-c(rep("Trend estimate",71),rep("2.5%CI",23),rep("97.5%CI",23))
+
+newdf[72:117,1]<-rep(2018:2040,times=2)
+
+for(i in 72:94){
+  newdf[i,5]<-newdf[48,5]*(1+trends[2]/100)^(i-68)
+  newdf[i,6]<-newdf[48,6]*(1+trends[2]/100)^(i-68)
+  newdf[i,7]<-newdf[48,7]*(1+trends[2]/100)^(i-68)
+  
+  newdf[i,2]<-round(AI2007[1]*newdf[i,5]/newdf[38,5],3)
+  newdf[i,3]<-round(AI2007[1]*newdf[i,6]/newdf[38,5],3)
+  newdf[i,4]<-round(AI2007[1]*newdf[i,7]/newdf[38,5],3)
+}
+newdf
+
+for(i in 95:117){
+  newdf[i,5]<-newdf[48,5]*(1+trends[3]/100)^(i-68)
+  newdf[i,6]<-newdf[48,6]*(1+trends[3]/100)^(i-68)
+  newdf[i,7]<-newdf[48,7]*(1+trends[3]/100)^(i-68)
+  
+  newdf[i,2]<-round(AI2007[1]*newdf[i,5]/newdf[38,5],3)
+  newdf[i,3]<-round(AI2007[1]*newdf[i,6]/newdf[38,5],3)
+  newdf[i,4]<-round(AI2007[1]*newdf[i,7]/newdf[38,5],3)
+}
+newdf
+
+
+ggplot(data=newdf)+
+  geom_ribbon(aes(x=year,ymin=upper,ymax=lower,fill=group),alpha=0.2)+
+  geom_line(aes(x=year,y=annualIndex,color=group))+
+  geom_vline(xintercept = 2007,  size=0.5)+
+  geom_segment(x=2018,y=0.7,xend=2037,yend=0.7,size=0.5,arrow = arrow(angle=90,ends="both",length=unit(0.08,"inches")))+
+  guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
+  labs(x = "Years", y="Annual Index", fill="",color="")+
+  annotate("text", x= 2006, y = 2,angle=90, label = ("BRT model reference year"),size=4)+
+  annotate("text", x= 2028, y = 0.8, label = ("Predictions with BBS trend (2017)"),size=4)
+
+library(scales)
+
+ggplot(data=newdf)+
+  geom_ribbon(aes(x=year,ymin=psizeLow,ymax=psizeUpp,fill=group),alpha=0.2)+
+  geom_line(aes(x=year,y=psize,color=group))+
+  geom_vline(xintercept = 2007,  size=0.5)+
+  geom_segment(x=2018,y=175000,xend=2040,yend=175000,size=0.5,arrow = arrow(angle=90,ends="both",length=unit(0.08,"inches")))+
+  guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
+  labs(x = "Years", y="Population size", fill="",color="")+
+  scale_y_continuous(labels = comma)+
+  annotate("text", x= 2006, y = 500000,angle=90, label = ("BRT model reference year (2007)"),size=4)+
+  annotate("text", x= 2028, y = 200000, label = ("Predictions with BBS trend (2017)"),size=4)+
+  geom_rug(data=yearsdata, aes(x=Year,y=Freq),sides="b", alpha=0.5, position="jitter")
+
+# Population size trajectory and future predictions with BBS long-term trend
+
+newdf2<-subset(newdf,group=="Trend estimate")
+newdf2[49:71,"psizeLow"]<-newdf[72:94,"psizeLow"]
+newdf2[49:71,"psizeUpp"]<-newdf[95:117,"psizeUpp"]
+
+jitter <- position_jitter(width = 0.05, height = 1)
+
+p1<-ggplot(data=newdf2)+
+  geom_ribbon(aes(x=year,ymin=psizeLow,ymax=psizeUpp),fill="blue",alpha=0.2)+
+  geom_line(aes(x=year,y=psize),color="blue")+
+  geom_vline(xintercept = 2007,  size=0.5,linetype="dashed")+
+  geom_errorbarh(aes(xmax=2040,xmin=2018,y=126000,height=20000))+
+  guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
+  labs(x = "Years", y="Population size", fill="",color="")+
+  scale_y_continuous(labels = comma)+
+  annotate("text", x= 2008, y = 400000,hjust=0, label = paste0("BRT model reference year (2007) \n", paste0("Estimate (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")")),size=4)+
+  annotate("text", x= 2029, y = 155000, label = ("Predictions with BBS long-term trend (2017): \n -1.78 (-3.560, 0.124)"),size=4)+
+  geom_rug(data=yearsdata, aes(x=Year,y=Freq),length=unit(yearsdata$Freq/50000,"npc"),sides="b", alpha=0.5, position=jitter)
+
+p1
+
+
+# Population size trajectory and future predictions with BBS short-term trend (20 years)
+newdf3<-data.frame(year=c(2018:2040),psize=NA,psizeLow=NA,psizeUpp=NA)
+newdf3<-rbind(newdf3,newdf3,newdf3)
+newdf3$group<-c(rep("Trend estimate",23),rep("2.5%CI",23),rep("97.5%CI",23))
+
+for(i in 1:23){
+  newdf3[i,2]<-newdf[48,5]*(1+trends[4]/100)^(newdf3$year[i]-2017)
+  newdf3[i,3]<-newdf[48,6]*(1+trends[4]/100)^(newdf3$year[i]-2017)
+  newdf3[i,4]<-newdf[48,7]*(1+trends[4]/100)^(newdf3$year[i]-2017)
+  }
+
+for(i in 24:46){
+  newdf3[i,2]<-newdf[48,5]*(1+trends[5]/100)^(newdf3$year[i]-2017)
+  newdf3[i,3]<-newdf[48,6]*(1+trends[5]/100)^(newdf3$year[i]-2017)
+  newdf3[i,4]<-newdf[48,7]*(1+trends[5]/100)^(newdf3$year[i]-2017)
+}
+
+for(i in 47:69){
+  newdf3[i,2]<-newdf[48,5]*(1+trends[6]/100)^(newdf3$year[i]-2017)
+  newdf3[i,3]<-newdf[48,6]*(1+trends[6]/100)^(newdf3$year[i]-2017)
+  newdf3[i,4]<-newdf[48,7]*(1+trends[6]/100)^(newdf3$year[i]-2017)
+}
+newdf3
+
+newdf4<-newdf2
+newdf4[49:71,"psize"]<-newdf3[1:23,"psize"]
+newdf4[49:71,"psizeLow"]<-newdf3[24:46,"psizeLow"]
+newdf4[49:71,"psizeUpp"]<-newdf3[47:69,"psizeUpp"]
+
+p2<- ggplot(data=newdf4)+
+  geom_ribbon(aes(x=year,ymin=psizeLow,ymax=psizeUpp),fill="darkgreen",alpha=0.2)+
+  geom_line(aes(x=year,y=psize),color="darkgreen")+
+  geom_vline(xintercept = 2007,  size=0.5,linetype="dashed")+
+  geom_errorbarh(aes(xmax=2040,xmin=2018,y=210000,height=20000))+
+  guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
+  labs(x = "Years", y="Population size", fill="",color="")+
+  scale_y_continuous(labels = comma)+
+  annotate("text", x= 2008, y = 400000,hjust=0, label = paste0("BRT model reference year (2007) \n", paste0("Estimate (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")")),size=4)+
+  annotate("text", x= 2029, y = 240000, label = ("Predictions with BBS short-term trend (2017): \n 5.460 (-3.310, 16.000)"),size=4)+
+  geom_rug(data=yearsdata, aes(x=Year,y=Freq),length=unit(yearsdata$Freq/50000,"npc"),sides="b", alpha=0.5, position=jitter)+
+  coord_cartesian(ylim = c(0, 675000)) 
+p2  
+
+library(gridExtra)
+grid.arrange(p1,p2,nrow=2)
+
+# Compare future pop.size based on trend with that from simulations in LANDIS ####
+
+getLandisPreds2040<-function(scenario){
+  filelist<-list.files("D:/CHID regional NS BRT/Landscape simulation results/Prediction raster/",pattern=scenario)
+  preds<-rep(NA,5)
+  for(i in 1:length(filelist)){
+    load(paste0("D:/CHID regional NS BRT/Landscape simulation results/Prediction raster/",filelist[i]))
+    landispreds2040<-PredictBirdsp.l[[3]] # 3 is for 2040
+    
+    landispreds2040<-landispreds2040*6.25  # Multiplying density values by 6.25 (hectars in a 250-250 pixel) to get abundance for each cell and overall population size
+    preds[i]<-cellStats(landispreds2040,stat=sum,na.rm=T)
+  }
+  preds.out<-data.frame(mean=mean(preds),sd=sd(preds))
+  
+  return(preds.out)
+  
+}
+
+scenarios<-getLandisPreds2040("baseline_BudwormBaselineFire_")
+scenarios[2,]<-getLandisPreds2040("baseline_BudwormBaselineFireEBFMHarvest_")
+scenarios[3,]<-getLandisPreds2040("baseline_BudwormBaselineFireHighCPRSHarvest_")
+scenarios[4,]<-getLandisPreds2040("baseline_BudwormBaselineFireHighPartialHarvest_")
+scenarios[5,]<-getLandisPreds2040("baseline_BudwormBaselineFireLowCPRSHarvest_")
+scenarios[6,]<-getLandisPreds2040("baseline_BudwormBaselineFireLowPartialHarvest_")
+
+scenarios[7,]<-getLandisPreds2040("RCP26_GrowthBudwormProjectedFire_")
+scenarios[8,]<-getLandisPreds2040("RCP26_GrowthBudwormProjectedFireEBFMHarvest_")
+scenarios[9,]<-getLandisPreds2040("RCP26_GrowthBudwormProjectedFireHighCPRSHarvest_")
+scenarios[10,]<-getLandisPreds2040("RCP26_GrowthBudwormProjectedFireHighPartialHarvest_")
+scenarios[11,]<-getLandisPreds2040("RCP26_GrowthBudwormProjectedFireLowCPRSHarvest_")
+scenarios[12,]<-getLandisPreds2040("RCP26_GrowthBudwormProjectedFireLowPartialHarvest_")
+
+scenarios[13,]<-getLandisPreds2040("RCP45_GrowthBudwormProjectedFire_")
+scenarios[14,]<-getLandisPreds2040("RCP45_GrowthBudwormProjectedFireEBFMHarvest_")
+scenarios[15,]<-getLandisPreds2040("RCP45_GrowthBudwormProjectedFireHighCPRSHarvest_")
+scenarios[16,]<-getLandisPreds2040("RCP45_GrowthBudwormProjectedFireHighPartialHarvest_")
+scenarios[17,]<-getLandisPreds2040("RCP45_GrowthBudwormProjectedFireLowCPRSHarvest_")
+scenarios[18,]<-getLandisPreds2040("RCP45_GrowthBudwormProjectedFireLowPartialHarvest_")
+
+scenarios[19,]<-getLandisPreds2040("RCP85_GrowthBudwormProjectedFire_")
+scenarios[20,]<-getLandisPreds2040("RCP85_GrowthBudwormProjectedFireEBFMHarvest_")
+scenarios[21,]<-getLandisPreds2040("RCP85_GrowthBudwormProjectedFireHighCPRSHarvest_")
+scenarios[22,]<-getLandisPreds2040("RCP85_GrowthBudwormProjectedFireHighPartialHarvest_")
+scenarios[23,]<-getLandisPreds2040("RCP85_GrowthBudwormProjectedFireLowCPRSHarvest_")
+scenarios[24,]<-getLandisPreds2040("RCP85_GrowthBudwormProjectedFireLowPartialHarvest_")
+
+# adding columns with scenario names
+filelist<-list.files("D:/CHID regional NS BRT/Landscape simulation results/Prediction raster/")
+
+scenario.names<-rep(NA,24)
+for(i in 1:24 ){
+  splits<-unlist(strsplit(filelist[seq(1,length(filelist),by=5)[i]], split="_"))
+  name.sce<-paste(splits[3],splits[4],sep="_")
+  scenario.names[i]<-name.sce
+}
+
+
+
+scenarios$scenario<-scenario.names
+scenarios$Climate<-rep(c("Baseline","RCP26","RCP45","RCP85"),each=6)
+
+
+scenarios
+
+p_inset<-
+  ggplot(data=newdf2)+
+  geom_line(aes(x=year,y=psize),color="blue",size=1)+
+  guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
+  scale_y_continuous(labels = comma)+
+  geom_pointrange(data=scenarios,mapping=aes(x=2040,y=mean,ymin=mean-1.96*sd,ymax=mean+1.96*sd,color=Climate),position=position_dodge2(width=0.2),alpha=0.8)+ 
+  coord_cartesian(xlim=c(2039,2042),ylim=c(39000,58000) )+
+  scale_x_continuous(labels=c("","2040","",""))+
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = c(0.75, 0.5)
+        )
+
+p_inset
+
+p1+
+  geom_pointrange(data=scenarios,mapping=aes(x=2040,y=mean,ymin=mean-1.96*sd,ymax=mean+1.96*sd))+ theme(legend.position = "none")+
+  annotation_custom(grob = ggplotGrob(p_inset), xmin=2020, xmax=2040, ymin=300000,ymax=500000)
+
+
+p_inset2<-
+  ggplot(data=newdf4)+
+  geom_line(aes(x=year,y=psize),color="darkgreen")+
+  geom_vline(xintercept = 2007,  size=0.5,linetype="dashed")+
+  geom_segment(x=2018,y=275000,xend=2040,yend=275000,size=0.5,arrow = arrow(angle=90,ends="both",length=unit(0.08,"inches")))+
+  guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
+  labs(x = "Years", y="Population size", fill="",color="")+
+  scale_y_continuous(labels = comma)+
+  geom_pointrange(data=scenarios,mapping=aes(x=2040,y=mean,ymin=mean-1.96*sd,ymax=mean+1.96*sd,color=Climate),position=position_dodge2(width=0.2),alpha=0.8)+
+  coord_cartesian(xlim=c(2039,2042),ylim=c(39000,200000))+
+  scale_x_continuous(labels=c("","2040","",""))+
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks = element_blank(),
+        legend.position = c(0.75, 0.5)) 
+#p_inset2  
+p2+
+  geom_pointrange(data=scenarios,mapping=aes(x=2040,y=mean,ymin=mean-1.96*sd,ymax=mean+1.96*sd))+ theme(legend.position = "none")+
+  annotation_custom(grob = ggplotGrob(p_inset2), xmin=2020, xmax=2040, ymin=400000,ymax=600000)
+
+
+# Future population size probability ####
+# long trend #
+future.pop<-newdf2[which(newdf2$year=="2040"),"psize"] ###
+
+future.pop.upp<-newdf2[which(newdf2$year=="2040"),"psizeUpp"]
+future.pop.low<-newdf2[which(newdf2$year=="2040"),"psizeLow"]
+
+
+GammaParamsFuture<-findGamma1(scale.init=c(2000,80000),shape.init = c(0.25,15),upp=future.pop.upp,low=future.pop.low)
+GammaParamsFuture
+
+
+futurepoprange<-seq(1000,200000,by=1000)
+id.dist.future<-pgamma(futurepoprange,shape=GammaParamsFuture$shape,scale=GammaParamsFuture$scale,lower.tail = F)
+id.df.future<-data.frame("Pop.range"=futurepoprange,"Probability"=id.dist.future)
+yfuturepred<-pgamma(future.pop,shape=GammaParamsFuture$shape,scale=GammaParamsFuture$scale,lower.tail = F)
+
+ggplot(id.df.future, aes(x = Pop.range, y = Probability)) + 
+  geom_point()+ 
+  geom_errorbarh(aes(xmax=future.pop.upp,xmin=future.pop.low,y=yfuturepred,height=0.05))+
+  geom_point(x = future.pop,y=yfuturepred,col="red")+  
+  labs(x="N",y="Probability population size >= N")+
+  annotate("text", x= 55000, y = 0.625,angle=0, label = paste0("Model prediction (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")"),size=4, hjust=0)
+
+
+# If using log-normal distribution
+# mu<-log(future.pop)
+# 
+# phi<-0.73737
+# qlnorm(p=c(0.025,0.975),meanlog = mu,sdlog=phi)
+# 
+# 
+# futurepoprange<-seq(1000,200000,by=1000)
+# id.dist.future<-plnorm(futurepoprange,meanlog=mu,sdlog=phi,lower.tail = F)
+# id.df.future<-data.frame("Pop.range"=futurepoprange,"Probability"=id.dist.future)
+# 
+# ggplot(id.df.future, aes(x = Pop.range, y = Probability)) + geom_point()+ geom_vline(xintercept = future.pop,  color = "blue", size=0.8)+
+#   labs(x="Population size")
+
+
+# short trend #
+# future.pop2<-newdf4[which(newdf3$year=="2040"),"psize"] ###
+# 
+# upp2<-newdf4[which(newdf4$year=="2040"),"psizeUpp"]
+# low2<-newdf4[which(newdf4$year=="2040"),"psizeLow"]
+# 
+# mat2<-expand.grid(scale=runif(1000,min=1000,max=100000),shape=runif(1000,min=0.2,max=30))
+# mat2[,3:4]<-t(apply(mat2,1,FUN = function(x){qgamma(p=c(0.025,0.975),shape=x[2],scale=x[1])}))
+# mat2$distances<-pointDistance(p1=mat2[,3:4],p2=c(low2,upp2),lonlat = F)
+# mat2[which.min(mat2$distances),]
+# 
+# low2
+# upp2
+# qgamma(p=c(0.025,0.975),shape = 15,scale=220000)
+# 
+# futurepoprange<-seq(1000,200000,by=1000)
+# id.dist.future<-pgamma(futurepoprange,shape=2.705717,scale=18677.86,lower.tail = F)
+# id.df.future<-data.frame("Pop.range"=futurepoprange,"Probability"=id.dist.future)
+
+
+
+# Future conditions population size - LANDIS simulations ####
+
+#1. Load bootstrap predictions tables
+bootpreds<-readRDS("D:/CHID regional NS BRT/Landscape simulation results/bootstrap_predictions.R")
+str(bootpreds)
+bootpreds$treatment<-as.factor(bootpreds$treatment)
+bootpreds$Year<-as.factor(bootpreds$Year)
+bootpreds$FireTreatment<-as.factor(bootpreds$FireTreatment)
+bootpreds$HarvestTreatment<-as.factor(bootpreds$HarvestTreatment)
+
+bootpreds$scenarioname<-rep(rep(rep(scenario.names,each=250),5),3)
+
+#2. Predictions for 2100 
+getLandisPreds2100<-function(scenario){
+  filelist<-list.files("D:/CHID regional NS BRT/Landscape simulation results/Prediction raster/",pattern=scenario)
+  preds<-rep(NA,5)
+  for(i in 1:length(filelist)){
+    load(paste0("D:/CHID regional NS BRT/Landscape simulation results/Prediction raster/",filelist[i]))
+    landispreds2040<-PredictBirdsp.l[[6]] # 6 is for 2100
+    
+    landispreds2040<-landispreds2040*6.25  # Multiplying density values by 6.25 (hectars in a 250-250 pixel) to get abundance for each cell and overall population size
+    preds[i]<-cellStats(landispreds2040,stat=sum,na.rm=T)
+  }
+  preds.out<-data.frame(mean=mean(preds),sd=sd(preds))
+  
+  return(preds.out)
+  }
+
+scenarios2100<-getLandisPreds2100("baseline_BudwormBaselineFire_")
+scenarios2100[2,]<-getLandisPreds2100("baseline_BudwormBaselineFireEBFMHarvest_")
+scenarios2100[3,]<-getLandisPreds2100("baseline_BudwormBaselineFireHighCPRSHarvest_")
+scenarios2100[4,]<-getLandisPreds2100("baseline_BudwormBaselineFireHighPartialHarvest_")
+scenarios2100[5,]<-getLandisPreds2100("baseline_BudwormBaselineFireLowCPRSHarvest_")
+scenarios2100[6,]<-getLandisPreds2100("baseline_BudwormBaselineFireLowPartialHarvest_")
+
+scenarios2100[7,]<-getLandisPreds2100("RCP26_GrowthBudwormProjectedFire_")
+scenarios2100[8,]<-getLandisPreds2100("RCP26_GrowthBudwormProjectedFireEBFMHarvest_")
+scenarios2100[9,]<-getLandisPreds2100("RCP26_GrowthBudwormProjectedFireHighCPRSHarvest_")
+scenarios2100[10,]<-getLandisPreds2100("RCP26_GrowthBudwormProjectedFireHighPartialHarvest_")
+scenarios2100[11,]<-getLandisPreds2100("RCP26_GrowthBudwormProjectedFireLowCPRSHarvest_")
+scenarios2100[12,]<-getLandisPreds2100("RCP26_GrowthBudwormProjectedFireLowPartialHarvest_")
+
+scenarios2100[13,]<-getLandisPreds2100("RCP45_GrowthBudwormProjectedFire_")
+scenarios2100[14,]<-getLandisPreds2100("RCP45_GrowthBudwormProjectedFireEBFMHarvest_")
+scenarios2100[15,]<-getLandisPreds2100("RCP45_GrowthBudwormProjectedFireHighCPRSHarvest_")
+scenarios2100[16,]<-getLandisPreds2100("RCP45_GrowthBudwormProjectedFireHighPartialHarvest_")
+scenarios2100[17,]<-getLandisPreds2100("RCP45_GrowthBudwormProjectedFireLowCPRSHarvest_")
+scenarios2100[18,]<-getLandisPreds2100("RCP45_GrowthBudwormProjectedFireLowPartialHarvest_")
+
+scenarios2100[19,]<-getLandisPreds2100("RCP85_GrowthBudwormProjectedFire_")
+scenarios2100[20,]<-getLandisPreds2100("RCP85_GrowthBudwormProjectedFireEBFMHarvest_")
+scenarios2100[21,]<-getLandisPreds2100("RCP85_GrowthBudwormProjectedFireHighCPRSHarvest_")
+scenarios2100[22,]<-getLandisPreds2100("RCP85_GrowthBudwormProjectedFireHighPartialHarvest_")
+scenarios2100[23,]<-getLandisPreds2100("RCP85_GrowthBudwormProjectedFireLowCPRSHarvest_")
+scenarios2100[24,]<-getLandisPreds2100("RCP85_GrowthBudwormProjectedFireLowPartialHarvest_")
+
+scenarios2100$scenario<-scenario.names
+scenarios2100$Climate<-rep(c("Baseline","RCP26","RCP45","RCP85"),each=6)
+
+scenarios2100
+
+
+#3. Quantify uncertainty from bootstrap predictions, for each scenario. This is achieved by aproximating the parameters of a gamma distribution whose quantiles fit those of the bootstrap distribution
+bootpreds2100<-subset(bootpreds,Year=="2100")
+summary(bootpreds2100)
+levels(bootpreds$treatment)
+
+# each of the objects below, representing the different scenarios, has 250 (bootstrao samples) x 5 (simulation replicates) = 1250 population size estimates
+baseline_BudwormBaselineFire_2100 <- bootpreds2100[which(bootpreds2100$treatment=="BudwormBaselineFire"),] 
+baseline_BudwormBaselineFireEBFMHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="BudwormBaselineFireEBFMHarvest"),]
+baseline_BudwormBaselineFireHighCPRSHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="BudwormBaselineFireHighCPRSHarvest"),]
+baseline_BudwormBaselineFireHighPartialHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="BudwormBaselineFireHighPartialHarvest"),]
+baseline_BudwormBaselineFireLowCPRSHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="BudwormBaselineFireLowCPRSHarvest"),]
+baseline_BudwormBaselineFireLowPartialHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="BudwormBaselineFireLowPartialHarvest"),]
+
+RCP26_GrowthBudwormProjectedFire_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFire"&bootpreds2100$scenario=="RCP26"),]
+RCP26_GrowthBudwormProjectedFireEBFMHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireEBFMHarvest"&bootpreds2100$scenario=="RCP26"),]
+RCP26_GrowthBudwormProjectedFireHighCPRSHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireHighCPRSHarvest"&bootpreds2100$scenario=="RCP26"),]
+RCP26_GrowthBudwormProjectedFireHighPartialHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireHighPartialHarvest"&bootpreds2100$scenario=="RCP26"),]
+RCP26_GrowthBudwormProjectedFireLowCPRSHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireLowCPRSHarvest"&bootpreds2100$scenario=="RCP26"),]
+RCP26_GrowthBudwormProjectedFireLowPartialHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireLowPartialHarvest"&bootpreds2100$scenario=="RCP26"),]
+
+RCP45_GrowthBudwormProjectedFire_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFire"&bootpreds2100$scenario=="RCP45"),]
+RCP45_GrowthBudwormProjectedFireEBFMHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireEBFMHarvest"&bootpreds2100$scenario=="RCP45"),]
+RCP45_GrowthBudwormProjectedFireHighCPRSHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireHighCPRSHarvest"&bootpreds2100$scenario=="RCP45"),]
+RCP45_GrowthBudwormProjectedFireHighPartialHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireHighPartialHarvest"&bootpreds2100$scenario=="RCP45"),]
+RCP45_GrowthBudwormProjectedFireLowCPRSHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireLowCPRSHarvest"&bootpreds2100$scenario=="RCP45"),]
+RCP45_GrowthBudwormProjectedFireLowPartialHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireLowPartialHarvest"&bootpreds2100$scenario=="RCP45"),]
+
+RCP85_GrowthBudwormProjectedFire_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFire"&bootpreds2100$scenario=="RCP85"),]
+RCP85_GrowthBudwormProjectedFireEBFMHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireEBFMHarvest"&bootpreds2100$scenario=="RCP85"),]
+RCP85_GrowthBudwormProjectedFireHighCPRSHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireHighCPRSHarvest"&bootpreds2100$scenario=="RCP85"),]
+RCP85_GrowthBudwormProjectedFireHighPartialHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireHighPartialHarvest"&bootpreds2100$scenario=="RCP85"),]
+RCP85_GrowthBudwormProjectedFireLowCPRSHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireLowCPRSHarvest"&bootpreds2100$scenario=="RCP85"),]
+RCP85_GrowthBudwormProjectedFireLowPartialHarvest_2100 <- bootpreds2100[which(bootpreds2100$treatment=="GrowthBudwormProjectedFireLowPartialHarvest"&bootpreds2100$scenario=="RCP85"),]
+
+boot_preds_2100_list<-list(baseline_BudwormBaselineFire_2100,
+                           baseline_BudwormBaselineFireEBFMHarvest_2100,
+                           baseline_BudwormBaselineFireHighCPRSHarvest_2100,
+                           baseline_BudwormBaselineFireHighPartialHarvest_2100,
+                           baseline_BudwormBaselineFireLowCPRSHarvest_2100,
+                           baseline_BudwormBaselineFireLowPartialHarvest_2100,
+                           RCP26_GrowthBudwormProjectedFire_2100,
+                           RCP26_GrowthBudwormProjectedFireEBFMHarvest_2100,
+                           RCP26_GrowthBudwormProjectedFireHighCPRSHarvest_2100,
+                           RCP26_GrowthBudwormProjectedFireHighPartialHarvest_2100,
+                           RCP26_GrowthBudwormProjectedFireLowCPRSHarvest_2100,
+                           RCP26_GrowthBudwormProjectedFireLowPartialHarvest_2100,
+                           RCP45_GrowthBudwormProjectedFire_2100,
+                           RCP45_GrowthBudwormProjectedFireEBFMHarvest_2100,
+                           RCP45_GrowthBudwormProjectedFireHighCPRSHarvest_2100,
+                           RCP45_GrowthBudwormProjectedFireHighPartialHarvest_2100,
+                           RCP45_GrowthBudwormProjectedFireLowCPRSHarvest_2100,
+                           RCP45_GrowthBudwormProjectedFireLowPartialHarvest_2100,
+                           RCP85_GrowthBudwormProjectedFire_2100,
+                           RCP85_GrowthBudwormProjectedFireEBFMHarvest_2100,
+                           RCP85_GrowthBudwormProjectedFireHighCPRSHarvest_2100,
+                           RCP85_GrowthBudwormProjectedFireHighPartialHarvest_2100,
+                           RCP85_GrowthBudwormProjectedFireLowCPRSHarvest_2100,
+                           RCP85_GrowthBudwormProjectedFireLowPartialHarvest_2100) 
+
+probsCI<-c(0.05,0.95) # can change these probabilities for more or less conservative intervals
+
+boot_preds_2100_CIs<-matrix(unlist(lapply(boot_preds_2100_list,FUN=function(x){quantile(x$Popsize, probs=probsCI)})),12,2,byrow = T)
+boot_preds_2100_CIs
+
+scenarios2100$bootLower<-boot_preds_2100_CIs[,1]
+scenarios2100$bootUpper<-boot_preds_2100_CIs[,2]
+scenarios2100 
+
+findGamma2<-function(x,scale.init,shape.init){
+ low<-as.numeric(x[5])
+ upp<-as.numeric(x[6])
+ mat<-expand.grid(scale=runif(1000,min=scale.init[1],max=scale.init[2]),shape=runif(1000,min=shape.init[1],max=shape.init[2]))
+ mat[,3:4]<-t(apply(mat,1,FUN = function(x){qgamma(p=c(0.025,0.975),shape=x[2],scale=x[1])}))
+ mat$distances<-pointDistance(p1=mat[,3:4],p2=c(low,upp),lonlat = F)
+ out1<-mat[which.min(mat$distances),]
+ 
+ scale.init2<-unlist(c(out1[1]-(out1[1]*0.25),out1[1]+(out1[1]*0.25)))
+ shape.init2<-unlist(c(out1[2]-(out1[2]*0.25),out1[2]+(out1[2]*0.25)))
+ 
+ mat2<-expand.grid(scale=runif(1000,min=scale.init2[1],max=scale.init2[2]),shape=runif(1000,min=shape.init2[2],max=shape.init2[2]))
+ mat2[,3:4]<-t(apply(mat2,1,FUN = function(x){qgamma(p=c(0.025,0.975),shape=x[2],scale=x[1])}))
+ mat2$distances<-pointDistance(p1=mat2[,3:4],p2=c(low,upp),lonlat = F)
+ 
+ mat3<-rbind(mat,mat2)
+ mat3[which.min(mat3$distances),]
+ }
+
+parametersGamma2100<-apply(scenarios2100,MARGIN = 1,FUN=findGamma2,scale.init=c(5000,9000000),shape.init = c(0.25,7))
+parametersGamma2100<-as.data.frame(matrix(unlist(parametersGamma2100),ncol=5,nrow=24,byrow=T, dimnames=list(1:24,names(parametersGamma2100[[1]]))))
+parametersGamma2100$scenario<-scenario.names
+parametersGamma2100
+
+#5. Generate scenario-specific pop size probability plots
+
+pop.prob.2100.plot<-as.list(scenarios2100$scenario)
+names(pop.prob.2100.plot)<-scenarios2100$scenario
+
+for(i in 1:length(pop.prob.2100.plot)){
+  futurepoprange<-seq(1000,200000,by=1000)
+  id.dist.future.2100<-pgamma(futurepoprange,shape=parametersGamma2100$shape[i],scale=parametersGamma2100$scale[i],lower.tail = F)
+  id.df.future.2100<-data.frame("Pop.range"=futurepoprange,"Probability"=id.dist.future.2100)
+  
+  pop.prob.2100.plot[[i]]<-ggplot(id.df.future.2100, aes(x = Pop.range, y = Probability)) +
+    geom_point()+ geom_vline(xintercept = scenarios2100$mean[i],  color = "blue", size=0.8)+
+    labs(x="Population size")+
+    annotate("text", x= 50000, y = 0.93,angle=0, label = paste0("Future population size \n prediction (",round(scenarios2100$mean[i],2),")"),size=4, hjust=0)+
+    annotate("text", x= 150000, y = 0.93,angle=0, label = paste0("Scenario: ",scenarios2100$scenario[i]),size=4)+
+    ylim(0,1)
+}
+
+pop.prob.2100.plot
+
+# population trajectories for each scenario
+getLandisTrajectory<-function(scenario){
+  filelist<-list.files("D:/CHID regional NS BRT/Landscape simulation results/Prediction raster/",pattern=scenario)
+  preds<-matrix(NA,11,5)
+  for(i in 1:length(filelist)){
+    load(paste0("D:/CHID regional NS BRT/Landscape simulation results/Prediction raster/",filelist[i]))
+    preds[,i]<-unlist(lapply(PredictBirdsp.l,FUN=function(x){cellStats(x*6.25,stat=sum,na.rm=T)}))
+    
+  }
+  preds.out<-data.frame(mean=apply(preds,1,mean),year=seq(2000,2200,by=20))
+
+  return(preds.out)
+}
+
+trajectories<-as.list(rep(NA,24))
+for(i in 1:length(scenario.names)){
+  trajectories[[i]]<-getLandisTrajectory(paste0(scenario.names,"_")[i])
+}
+trajectories
+
+trajectories<-bind_rows(trajectories)
+trajectories$scenario<-rep(scenario.names,each=11)
+
+#trajectories<-subset(trajectories,year>2010)
+
+traj_boot<-aggregate(bootpreds$Popsize,by=list(bootpreds$scenarioname,bootpreds$Year),FUN=quantile,probs=c(0.025,0.975))
+traj_boot<-traj_boot[order(traj_boot$Group.1),]
+traj_boot<-data.frame(scenario=traj_boot$Group.1,year=traj_boot$Group.2,lower=traj_boot$x[,1],upper=traj_boot$x[,2])
+traj_boot$year<-as.numeric(as.character(traj_boot$year))
+
+
+p1+ 
+  geom_line(data=trajectories,aes(x=year,y=mean,color=scenario))+
+  guides(col=guide_legend(ncol=1))+
+  theme(legend.text=element_text(size=8))
+
+p1+ 
+  geom_ribbon(data=traj_boot,aes(x=year,ymin=lower,ymax=upper,fill=scenario),alpha=0.02)+
+  geom_line(data=subset(trajectories,year<2101),aes(x=year,y=mean,color=scenario))+
+  theme(legend.position = "none")
+
+#save.image("D:/CHID regional NS BRT/BRT_outputs/outputs2.RData")
+
+#load("D:/CHID regional NS BRT/BRT_outputs/outputs.RData")
+
+#6. Calculate future trend 
+futuretrend<-function(datafuture,datacurrent=newdf2,baseyear=2017){
+  years<-2100-baseyear
+  
+  N0<-datacurrent[which(datacurrent$year==baseyear),"psize"]
+  lower<-datacurrent[which(datacurrent$year==baseyear),"psizeLow"]
+  upper<-datacurrent[which(datacurrent$year==baseyear),"psizeUpp"]
+  
+  N1<-datafuture
+  
+  trend<-100*((N1/N0)^(1/years)-1)
+  trendLow<-100*((N1/upper)^(1/years)-1)
+  trendUpp<-100*((N1/lower)^(1/years)-1)
+  
+  return(data.frame(trend=trend,lowerCL=trendLow,upperCL=trendUpp))
+}
+
+## Estimates
+futuretrendsSims<-futuretrend(datafuture = scenarios2100$mean)
+futuretrendsSims$scenario<-as.factor(scenario.names)
+futuretrendsSims
+
+## bootstrap samples
+boot_preds_2100_df<-rbind(baseline_BudwormBaselineFire_2100,
+                           baseline_BudwormBaselineFireEBFMHarvest_2100,
+                           baseline_BudwormBaselineFireHighCPRSHarvest_2100,
+                           baseline_BudwormBaselineFireHighPartialHarvest_2100,
+                           baseline_BudwormBaselineFireLowCPRSHarvest_2100,
+                           baseline_BudwormBaselineFireLowPartialHarvest_2100,
+                           RCP26_GrowthBudwormProjectedFire_2100,
+                           RCP26_GrowthBudwormProjectedFireEBFMHarvest_2100,
+                           RCP26_GrowthBudwormProjectedFireHighCPRSHarvest_2100,
+                           RCP26_GrowthBudwormProjectedFireHighPartialHarvest_2100,
+                           RCP26_GrowthBudwormProjectedFireLowCPRSHarvest_2100,
+                           RCP26_GrowthBudwormProjectedFireLowPartialHarvest_2100,
+                           RCP45_GrowthBudwormProjectedFire_2100,
+                           RCP45_GrowthBudwormProjectedFireEBFMHarvest_2100,
+                           RCP45_GrowthBudwormProjectedFireHighCPRSHarvest_2100,
+                           RCP45_GrowthBudwormProjectedFireHighPartialHarvest_2100,
+                           RCP45_GrowthBudwormProjectedFireLowCPRSHarvest_2100,
+                           RCP45_GrowthBudwormProjectedFireLowPartialHarvest_2100,
+                           RCP85_GrowthBudwormProjectedFire_2100,
+                           RCP85_GrowthBudwormProjectedFireEBFMHarvest_2100,
+                           RCP85_GrowthBudwormProjectedFireHighCPRSHarvest_2100,
+                           RCP85_GrowthBudwormProjectedFireHighPartialHarvest_2100,
+                           RCP85_GrowthBudwormProjectedFireLowCPRSHarvest_2100,
+                           RCP85_GrowthBudwormProjectedFireLowPartialHarvest_2100) 
 
 
 
 
-#### Residual trend ####
-# the first 7290 rows in datcombo are from 2005 and earlier period. the rest is from 2006 and later.
-datcombo$period<-"2005 and earlier"
-datcombo$period[7291:15059]<-"2006 and later"
 
-fit<-log(brt5$fitted)
+fut.trend.df<-futuretrend(datafuture=boot_preds_2100_df$Popsize)
+fut.trend.df
 
-m <- glm(datcombo$ABUND ~ datcombo$period, family=poisson, offset=fit+datcombo$logoffset)
-trend <-  100*(exp(coef(m)[2])-1)
+fut.trend.df$scenario<-as.factor(rep(scenario.names,each=1250))
+
+fut.trends.plot<-ggplot(fut.trend.df,aes(x=scenario,y=trend))+geom_boxplot()+coord_flip()+geom_hline(yintercept=0, colour="blue")+geom_point(data=futuretrendsSims,aes(x=scenario,y=trend),shape=3,color="red")
+fut.trends.plot
+
+
+futuretrend2<-function(scenarioindex,datafuture=scenarios2100,datacurrent=newdf2,baseyear=2017){
+  years<-2100-baseyear
+
+  N0<-datacurrent[which(datacurrent$year==baseyear),"psize"]
+  lower<-datacurrent[which(datacurrent$year==baseyear),"psizeLow"]
+  upper<-datacurrent[which(datacurrent$year==baseyear),"psizeUpp"]
+
+  N1<-datafuture[scenarioindex,"mean"]
+  N1low<-datafuture[scenarioindex,"bootLower"]
+  N1upp<-datafuture[scenarioindex,"bootUpper"]
+
+  trend<-100*((N1/N0)^(1/years)-1)
+  trendLow<-100*((N1low/upper)^(1/years)-1)
+  trendUpp<-100*((N1upp/lower)^(1/years)-1)
+
+  return(data.frame(trend=trend,lowerCL=trendLow,upperCL=trendUpp))
+}
+
+
+fut.trend.df2<-as.data.frame(matrix(unlist(lapply(1:24,FUN=futuretrend2)),ncol=3,nrow=24,byrow=T, dimnames=list(1:24,c("trend","lowerCL","upperCL"))))
+
+fut.trend.df2$scenario<-as.factor(scenario.names)
+fut.trend.df2
+
+fut.trend.df2$maxmin<-3
+fut.trend.df2$maxmin[(which.min(fut.trend.df2$trend))]<-1
+fut.trend.df2$maxmin[(which.max(fut.trend.df2$trend))]<-2
+
+
+fut.trends.plot2<-ggplot(fut.trend.df2,aes(x=trend,y=scenario,color=factor(maxmin)))+
+  geom_point()+xlim(-8,8)+
+  geom_errorbarh(data=fut.trend.df2,aes(xmax=upperCL,xmin=lowerCL,color=factor(maxmin)))+
+  labs(x="Future trend (2017-2100)",y="Scenario")+
+  scale_color_manual(labels=c("Minimum","Maximum","Others"),values=c("Red","Blue", "Black")) +
+  theme(legend.title = element_blank())
+
+fut.trends.plot2
+
+#7. Estimate distribution function for future trend
+
+
+
+
+#8. Generate plot for future trend distribution function
+
+
+### Summarize current predictions by land cover type ####
+
+##MODIS-based landcover (250-m)
+nalc2005<-raster("M:/DataStuff/SpatialData/LCC05_NALCMS2010/Land_Cover_MXD/NA_LandCover_2005/data/NA_LandCover_2005/NA_LandCover_2005_LCC.img")
+nalc2005<-projectRaster(nalc2005,rast2, method="ngb")
+lc<-crop(nalc2005,rast2)
+lc<-mask(nalc2005,rast2)
+
+pred<-getValues(rast2)
+predUpp<-getValues(upper2)
+predLow<-getValues(lower2)
+
+lcv<-getValues(lc)
+lcv<-as.factor(as.character(lcv))
+table(lcv)
+
+pred1<-data.frame(pred=pred,upper=predUpp,lower=predLow,class=lcv)
+pred1$count<-1
+
+lcdens<-aggregate(pred1[,1:3], by=list(pred1$class),FUN="mean", na.rm=T)
+names(lcdens)<-c("class", "mean_density","upper", "lower")
+
+ltnalc <- read.csv("C:/Users/voeroesd/Documents/Repos/bamanalytics/lookup/nalcms.csv")
+lcdens$LCclass<-ltnalc$Label[match(lcdens$class, ltnalc$Value)]
+lcdens$LCclass<-factor(as.character(lcdens$LCclass))
+lcdens$LCclassName<-ltnalc$Class_name[match(lcdens$class, ltnalc$Value)]
+lcdens$LCclassName<-factor(as.character(lcdens$LCclassName))
+lcdens
+
+
+lc1<-aggregate(pred1$count, by=list(pred1$class),FUN="sum", na.rm=T)
+names(lc1)<-c("class","area")
+lc1$areaprop<-lc1$area/sum(lc1$area) 
+lc1
+
+lcdens$area<-lc1$area
+lcdens$areaprop<-lc1$areaprop
+lcdens
+
+p<-ggplot(lcdens,aes(x=LCclassName,y=mean_density))+
+  geom_bar(aes(fill=LCclassName),width=lcdens$areaprop,alpha=0.3, stat="identity")+
+  geom_pointrange(aes(ymin=lower,ymax=upper,color=LCclassName))+
+  xlab("Land cover class")+
+  ylab("Mean density (males/ha)")+
+  theme(axis.text.x = element_blank(),axis.ticks.x = element_blank())+
+  labs(fill = "Land cover class",color="Land cover class")
+p
+
+
+
+# CTI
+CTI<-raster("D:/CTI/CTI_NS.tif")
+CTI<-projectRaster(CTI,rast2)
+CTI<-mask(CTI,rast2)
+
+pred1$CTIq<-NA
+pred1$CTIq[which(CTIv<6.9)]<-"Q1"
+pred1$CTIq[which(6.9<CTIv&CTIv<7)]<-"Q2"
+pred1$CTIq[which(7<CTIv&CTIv<8)]<-"Q3"
+pred1$CTIq[which(CTIv>8)]<-"Q4"
+
+CTI_habdens<-aggregate(pred1[,1:3], by=list(pred1$class,pred1$CTIq),FUN="mean", na.rm=T)
+names(CTI_habdens)<-c("class","CTIq" ,"mean_density","upper", "lower")
+CTI_habdens$LCclass<-ltnalc$Label[match(CTI_habdens$class, ltnalc$Value)]
+CTI_habdens$LCclass<-factor(as.character(CTI_habdens$LCclass))
+CTI_habdens$LCclassName<-ltnalc$Class_name[match(CTI_habdens$class, ltnalc$Value)]
+CTI_habdens$LCclassName<-factor(as.character(CTI_habdens$LCclassName))
+CTI_habdens
+
+lc2<-aggregate(pred1$count, by=list(pred1$class,pred1$CTIq),FUN="sum", na.rm=T)
+names(lc2)<-c("class","CTIq","area")
+lc2$areaprop<-lc2$area/sum(lc2$area) 
+lc2
+
+CTI_habdens$area<-lc2$area
+CTI_habdens$areaprop<-lc2$areaprop
+CTI_habdens$id<-paste0(CTI_habdens$LCclassName,CTI_habdens$CTIq)
+
+pCTI<-ggplot(CTI_habdens,aes(x=id,y=mean_density))+
+  geom_bar(aes(fill=LCclassName),alpha=0.3, stat="identity")+
+  geom_errorbar(aes(ymin=lower,ymax=upper,color=LCclassName,linetype=CTIq),size=0.8,position = position_dodge(width = 1))+
+  #geom_point(aes(color=LCclassName))+
+  xlab("Land cover class")+
+  ylab("Mean density (males/ha)")+
+  theme(axis.text.x = element_blank(),axis.ticks.x = element_blank())+
+  scale_x_discrete(limits = rev(levels(CTI_habdens$id)))+
+  labs(fill = "Land cover class",color="Land cover class",linetype="CTI quartiles")
+pCTI
+
 
 # Assessing sampling representativeness ####
 # The method measures the similarity of any given point to a reference set ofpoints, with respect to the chosen predictor variables. It reports the closeness of the point to the distribution of reference points, gives negative values for dissimilar points and maps these values across the whole prediction region.
