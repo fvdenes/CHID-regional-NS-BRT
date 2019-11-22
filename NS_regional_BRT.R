@@ -792,7 +792,7 @@ library(ggplot2)
 
 # Model deviance
 
-df<- data.frame(grp=c("Full model",
+df_devplot<- data.frame(grp=c("Full model",
                       "Selected scales",
                       #"cell level",
                       "250m Gaussian smooth",
@@ -808,12 +808,12 @@ df<- data.frame(grp=c("Full model",
                      brt4$cv.statistics$deviance.se,
                      brt5$cv.statistics$deviance.se)
 )
-df
-k<-ggplot(df, aes(grp,deviance,ymin=deviance-se,ymax=deviance+se))
+df_devplot
+k<-ggplot(df_devplot, aes(grp,deviance,ymin=deviance-se,ymax=deviance+se))
 k+geom_pointrange()
 
 # correlation
-df2<- data.frame(grp=c("Full model",
+df_corrplot<- data.frame(grp=c("Full model",
                        "Selected scales",
                        #"cell level",
                        "250m Gaussian smooth",
@@ -829,13 +829,13 @@ df2<- data.frame(grp=c("Full model",
                       brt4$cv.statistics$correlation.se,
                       brt5$cv.statistics$correlation.se)
 )
-df2
-k2<-ggplot(df2, aes(grp,correlation,ymin=correlation-se,ymax=correlation+se))
+df_corrplot
+k2<-ggplot(df_corrplot, aes(grp,correlation,ymin=correlation-se,ymax=correlation+se))
 k2+geom_pointrange()
 
 # Calibration:  The first two statistics were the estimated intercepts and slopes of linear regression models of predictions against observations. The intercept measures the magnitude and direction of bias, with values close to 0 indicating low or no bias. The slope yields information about the consistency in the bias as a function of the mean, with a value of 1 indicating a consistent bias if the intercept is a nonzero value.
 ## intercept
-df3<- data.frame(grp=c("Full model",
+df_calli_int_plot<- data.frame(grp=c("Full model",
                        "Selected scales",
                        #"cell level",
                        "250m Gaussian smooth",
@@ -851,12 +851,12 @@ df3<- data.frame(grp=c("Full model",
                       brt4$cv.statistics$calibration.se[1],
                       brt5$cv.statistics$calibration.se[1])
 )
-df3
-k3<-ggplot(df3, aes(grp,calibration.intercept,ymin=calibration.intercept-se,ymax=calibration.intercept+se))
+df_calli_int_plot
+k3<-ggplot(df_calli_int_plot, aes(grp,calibration.intercept,ymin=calibration.intercept-se,ymax=calibration.intercept+se))
 k3+geom_pointrange()
 
 ## slope
-df4<- data.frame(grp=c("Full model",
+df_calli_slope_plot<- data.frame(grp=c("Full model",
                        "Selected scales",
                        #"cell level",
                        "250m Gaussian smooth",
@@ -872,8 +872,8 @@ df4<- data.frame(grp=c("Full model",
                       brt4$cv.statistics$calibration.se[2],
                       brt5$cv.statistics$calibration.se[2])
 )
-df4
-k4<-ggplot(df4, aes(grp,calibration.slope,ymin=calibration.slope-se,ymax=calibration.slope+se))
+df_calli_slope_plot
+k4<-ggplot(df_calli_slope_plot, aes(grp,calibration.slope,ymin=calibration.slope-se,ymax=calibration.slope+se))
 k4+geom_pointrange()
 
 
@@ -894,7 +894,7 @@ dev_plot<-function(brt){
   abline(v = target.trees, col=4)
 }
 
-dev_plot(brt4)
+dev_plot(brt5)
 
 
 ####
@@ -1014,9 +1014,11 @@ rast2<-mask(rast,PredictBirdsp.l[[1]])
 # Multiplying density values by 6.25 (hectars in a 250-250 pixel) to get abundance for each cell and overall population size
 
 density_brt5_250m<-rast2*6.25
-
-
 popsize<-cellStats(density_brt5_250m,stat=sum,na.rm=T) # THIS IS ESTIMATED POPULATION SIZE
+
+
+density_brt5_250m_full<-rast*6.25
+popsize_full<-cellStats(density_brt5_250m_full,stat=sum,na.rm=T)
 
 
 # alternative is to obtain 100 random Poisson draws using cell density as rate parameter:
@@ -1035,6 +1037,9 @@ upper2<-mask(upper,PredictBirdsp.l[[1]])
 upper_brt5_250m<-upper2*6.25
 popsize.upp<-cellStats(upper_brt5_250m,stat=sum,na.rm=T)
 
+upper_brt5_250m_full<-upper*6.25
+popsize.upp_full<-cellStats(upper_brt5_250m_full,stat=sum,na.rm=T)
+
 # v2<-values(upper_brt5_250m)[!is.na(values(upper_brt5_250m))]
 # abundance_upper_brt5<-matrix(NA,length(v2),100)
 # for(i in 1:nrow(abundance_upper_brt5)){
@@ -1047,6 +1052,8 @@ lower2<-mask(lower,PredictBirdsp.l[[1]])
 lower_brt5_250m<-lower2*6.25
 popsize.low<-cellStats(lower_brt5_250m,stat=sum,na.rm=T)
 
+lower_brt5_250m_full<-lower*6.25
+popsize.low_full<-cellStats(lower_brt5_250m_full,stat=sum,na.rm=T)
 # v3<-values(lower_brt5_250m)[!is.na(values(lower_brt5_250m))]
 # abundance_lower_brt5<-matrix(NA,length(v3),100)
 # for(i in 1:nrow(abundance_lower_brt5)){
@@ -1142,10 +1149,26 @@ ggplot(rbind(id.df,id.df.gamma)) +
   geom_point(x = popsize,y=ycurrentpredgamma)+
   geom_errorbarh(aes(xmax=popsize.upp,xmin=popsize.low,y=ycurrentprednormal,height=0.03),color="#F8766D")+
   geom_point(x = popsize,y=ycurrentprednormal)+  
-  labs(x="N",y="Probability population size >= N")+
+  labs(x="N",y="Probability (population size >= N)")+
   annotate("text", x= 38000, y = 0.57,hjust=0, label = paste0("Model prediction (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")"),size=4)
 
+ggplot(rbind(id.df)) + 
+  geom_point(aes(x = Pop.range, y = Probability),color="#F8766D")+ 
+  #geom_errorbarh(aes(xmax=popsize.upp,xmin=popsize.low,y=ycurrentpredgamma,height=0.03),color="#00BFC4")+
+  #geom_point(x = popsize,y=ycurrentpredgamma)+
+  geom_errorbarh(aes(xmax=popsize.upp,xmin=popsize.low,y=ycurrentprednormal,height=0.03),color="#F8766D")+
+  geom_point(x = popsize,y=ycurrentprednormal)+  
+  labs(x="N",y="Probability (population size >= N)")+
+  annotate("text", x= 38000, y = 0.57,hjust=0, label = paste0("Model prediction (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")"),size=4)
 
+ggplot(rbind(id.df.gamma)) + 
+  geom_point(aes(x = Pop.range, y = Probability),color="#00BFC4")+ 
+  geom_errorbarh(aes(xmax=popsize.upp,xmin=popsize.low,y=ycurrentpredgamma,height=0.03),color="#00BFC4")+
+  geom_point(x = popsize,y=ycurrentpredgamma)+
+  #geom_errorbarh(aes(xmax=popsize.upp,xmin=popsize.low,y=ycurrentprednormal,height=0.03),color="#F8766D")+
+  #geom_point(x = popsize,y=ycurrentprednormal)+  
+  labs(x="N",y="Probability (population size >= N)")+
+  annotate("text", x= 38000, y = 0.57,hjust=0, label = paste0("Model prediction (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")"),size=4)
 
 #### Future Population size - current conditions ####
 # trend from BBS (Smith et al 2014), CAWA in Nova Scotia
@@ -1329,7 +1352,7 @@ p1<-ggplot(data=newdf2)+
   geom_vline(xintercept = 2007,  size=0.5,linetype="dashed")+
   geom_errorbarh(aes(xmax=2040,xmin=2018,y=126000,height=20000))+
   guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
-  labs(x = "Years", y="Population size", fill="",color="")+
+  labs(x = "Years", y="Population size (males)", fill="",color="")+
   scale_y_continuous(labels = comma)+
   annotate("text", x= 2008, y = 400000,hjust=0, label = paste0("BRT model reference year (2007) \n", paste0("Estimate (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")")),size=4)+
   annotate("text", x= 2029, y = 155000, label = ("Predictions with BBS long-term trend (2017): \n -1.78 (-3.560, 0.124)"),size=4)+
@@ -1338,7 +1361,7 @@ p1<-ggplot(data=newdf2)+
 p1
 
 
-# Population size trajectory and future predictions with BBS short-term trend (20 years)
+# Population size trajectory and future predictions with BBS short-term trend (10 years)
 newdf3<-data.frame(year=c(2018:2040),psize=NA,psizeLow=NA,psizeUpp=NA)
 newdf3<-rbind(newdf3,newdf3,newdf3)
 newdf3$group<-c(rep("Trend estimate",23),rep("2.5%CI",23),rep("97.5%CI",23))
@@ -1373,9 +1396,9 @@ p2<- ggplot(data=newdf4)+
   geom_vline(xintercept = 2007,  size=0.5,linetype="dashed")+
   geom_errorbarh(aes(xmax=2040,xmin=2018,y=210000,height=20000))+
   guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
-  labs(x = "Years", y="Population size", fill="",color="")+
+  labs(x = "Years", y="Population size (males)", fill="",color="")+
   scale_y_continuous(labels = comma)+
-  annotate("text", x= 2008, y = 400000,hjust=0, label = paste0("BRT model reference year (2007) \n", paste0("Estimate (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")")),size=4)+
+  annotate("text", x= 2008, y = 650000,hjust=0, label = paste0("BRT model reference year (2007) \n", paste0("Estimate (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")")),size=4)+
   annotate("text", x= 2029, y = 240000, label = ("Predictions with BBS short-term trend (2017): \n 5.460 (-3.310, 16.000)"),size=4)+
   geom_rug(data=yearsdata, aes(x=Year,y=Freq),length=unit(yearsdata$Freq/50000,"npc"),sides="b", alpha=0.5, position=jitter)+
   coord_cartesian(ylim = c(0, 675000)) 
@@ -1466,7 +1489,7 @@ p_inset
 
 p1+
   geom_pointrange(data=scenarios,mapping=aes(x=2040,y=mean,ymin=mean-1.96*sd,ymax=mean+1.96*sd))+ theme(legend.position = "none")+
-  annotation_custom(grob = ggplotGrob(p_inset), xmin=2020, xmax=2040, ymin=300000,ymax=500000)
+  annotation_custom(grob = ggplotGrob(p_inset), xmin=2020, xmax=2040, ymin=200000,ymax=350000)
 
 
 p_inset2<-
@@ -1511,8 +1534,8 @@ ggplot(id.df.future, aes(x = Pop.range, y = Probability)) +
   geom_point()+ 
   geom_errorbarh(aes(xmax=future.pop.upp,xmin=future.pop.low,y=yfuturepred,height=0.05))+
   geom_point(x = future.pop,y=yfuturepred,col="red")+  
-  labs(x="N",y="Probability population size >= N")+
-  annotate("text", x= 55000, y = 0.625,angle=0, label = paste0("Model prediction (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")"),size=4, hjust=0)
+  labs(x="N",y="Probability (population size >= N)")+
+  annotate("text", x= 55000, y = 0.625,angle=0, label = paste0("Model prediction (90% CI) = ",round(future.pop,0)," (",round(future.pop.low,0)," - ",round(future.pop.upp,0),")"),size=4, hjust=0)
 
 
 # If using log-normal distribution
@@ -1531,7 +1554,7 @@ ggplot(id.df.future, aes(x = Pop.range, y = Probability)) +
 
 
 # short trend #
-# future.pop2<-newdf4[which(newdf3$year=="2040"),"psize"] ###
+# future.pop2<-newdf4[which(newdf4$year=="2040"),"psize"] ###
 # 
 # upp2<-newdf4[which(newdf4$year=="2040"),"psizeUpp"]
 # low2<-newdf4[which(newdf4$year=="2040"),"psizeLow"]
@@ -1553,17 +1576,7 @@ ggplot(id.df.future, aes(x = Pop.range, y = Probability)) +
 
 # Future conditions population size - LANDIS simulations ####
 
-#1. Load bootstrap predictions tables
-bootpreds<-readRDS("D:/CHID regional NS BRT/Landscape simulation results/bootstrap_predictions.R")
-str(bootpreds)
-bootpreds$treatment<-as.factor(bootpreds$treatment)
-bootpreds$Year<-as.factor(bootpreds$Year)
-bootpreds$FireTreatment<-as.factor(bootpreds$FireTreatment)
-bootpreds$HarvestTreatment<-as.factor(bootpreds$HarvestTreatment)
-
-bootpreds$scenarioname<-rep(rep(rep(scenario.names,each=250),5),3)
-
-#2. Predictions for 2100 
+#1. Predictions for 2100 
 getLandisPreds2100<-function(scenario){
   filelist<-list.files("D:/CHID regional NS BRT/Landscape simulation results/Prediction raster/",pattern=scenario)
   preds<-rep(NA,5)
@@ -1611,6 +1624,16 @@ scenarios2100$scenario<-scenario.names
 scenarios2100$Climate<-rep(c("Baseline","RCP26","RCP45","RCP85"),each=6)
 
 scenarios2100
+#CONTINUE - LANDIS BOOTSTRAP PREDICTIONS ####
+#2. Load bootstrap predictions tables
+bootpreds<-readRDS("D:/CHID regional NS BRT/Landscape simulation results/bootstrap_predictions2100.R")
+str(bootpreds)
+bootpreds$treatment<-as.factor(bootpreds$treatment)
+bootpreds$Year<-as.factor(bootpreds$Year)
+bootpreds$FireTreatment<-as.factor(bootpreds$FireTreatment)
+bootpreds$HarvestTreatment<-as.factor(bootpreds$HarvestTreatment)
+
+bootpreds$scenarioname<-rep(rep(scenario.names,each=250),5)
 
 
 #3. Quantify uncertainty from bootstrap predictions, for each scenario. This is achieved by aproximating the parameters of a gamma distribution whose quantiles fit those of the bootstrap distribution
@@ -1674,7 +1697,7 @@ boot_preds_2100_list<-list(baseline_BudwormBaselineFire_2100,
 
 probsCI<-c(0.05,0.95) # can change these probabilities for more or less conservative intervals
 
-boot_preds_2100_CIs<-matrix(unlist(lapply(boot_preds_2100_list,FUN=function(x){quantile(x$Popsize, probs=probsCI)})),12,2,byrow = T)
+boot_preds_2100_CIs<-matrix(unlist(lapply(boot_preds_2100_list,FUN=function(x){quantile(x$Popsize, probs=probsCI)})),24,2,byrow = T)
 boot_preds_2100_CIs
 
 scenarios2100$bootLower<-boot_preds_2100_CIs[,1]
@@ -1700,29 +1723,39 @@ findGamma2<-function(x,scale.init,shape.init){
  mat3[which.min(mat3$distances),]
  }
 
-parametersGamma2100<-apply(scenarios2100,MARGIN = 1,FUN=findGamma2,scale.init=c(5000,9000000),shape.init = c(0.25,7))
+parametersGamma2100<-apply(scenarios2100,MARGIN = 1,FUN=findGamma2,scale.init=c(20000,80000),shape.init = c(0.25,15))
 parametersGamma2100<-as.data.frame(matrix(unlist(parametersGamma2100),ncol=5,nrow=24,byrow=T, dimnames=list(1:24,names(parametersGamma2100[[1]]))))
 parametersGamma2100$scenario<-scenario.names
 parametersGamma2100
+names(parametersGamma2100)[c(3,4)]<-c("lowerCL","upperCL")
 
-#5. Generate scenario-specific pop size probability plots
+# Scenario-specific future pop size probability plots ####
 
-pop.prob.2100.plot<-as.list(scenarios2100$scenario)
-names(pop.prob.2100.plot)<-scenarios2100$scenario
+pop.prob.2100<-as.list(scenarios2100$scenario)
+names(pop.prob.2100)<-scenarios2100$scenario
 
-for(i in 1:length(pop.prob.2100.plot)){
-  futurepoprange<-seq(1000,200000,by=1000)
+id.df.future.2100<-data.frame("Pop.range"=NA,"Probability"=NA,"scenario"=NA)
+for(i in 1:length(pop.prob.2100)){
+  futurepoprange<-seq(1000,350000,by=1000)
   id.dist.future.2100<-pgamma(futurepoprange,shape=parametersGamma2100$shape[i],scale=parametersGamma2100$scale[i],lower.tail = F)
-  id.df.future.2100<-data.frame("Pop.range"=futurepoprange,"Probability"=id.dist.future.2100)
   
-  pop.prob.2100.plot[[i]]<-ggplot(id.df.future.2100, aes(x = Pop.range, y = Probability)) +
-    geom_point()+ geom_vline(xintercept = scenarios2100$mean[i],  color = "blue", size=0.8)+
-    labs(x="Population size")+
-    annotate("text", x= 50000, y = 0.93,angle=0, label = paste0("Future population size \n prediction (",round(scenarios2100$mean[i],2),")"),size=4, hjust=0)+
-    annotate("text", x= 150000, y = 0.93,angle=0, label = paste0("Scenario: ",scenarios2100$scenario[i]),size=4)+
-    ylim(0,1)
+  id.df.future.2100[(1:length(futurepoprange))+length(futurepoprange)*(i-1),]<-cbind(futurepoprange,id.dist.future.2100,names(pop.prob.2100)[i])
 }
 
+id.df.future.2100$Pop.range<-as.numeric(id.df.future.2100$Pop.range)
+id.df.future.2100$Probability<-as.numeric(id.df.future.2100$Probability)
+str(id.df.future.2100)
+
+pop.prob.2100.plot<-ggplot(id.df.future.2100, aes(x = Pop.range, y = Probability,color=scenario)) +
+  geom_point()+
+  geom_vline(mapping=aes(xintercept = mean,color=scenario),data=scenarios2100, size=0.8,alpha=0.4)+
+  labs(x="Population size")+
+  annotate("text", x= 55000, y = 0.93,angle=0, label = paste0("Future population size predictions \n (mean = ",round(mean(scenarios2100$mean),0),")"),size=4, hjust=0)+
+  #annotate("text", x= 150000, y = 0.93,angle=0, label = paste0("Scenario: ",scenarios2100$scenario[i]),size=4)+
+  ylim(0,1)+
+  scale_color_discrete(guide=guide_legend(ncol=1))+
+  scale_x_continuous(labels = scales::comma)+
+  labs(x="N",y="Probability (population size >= N)")
 pop.prob.2100.plot
 
 # population trajectories for each scenario
@@ -1748,23 +1781,34 @@ trajectories
 trajectories<-bind_rows(trajectories)
 trajectories$scenario<-rep(scenario.names,each=11)
 
-#trajectories<-subset(trajectories,year>2010)
+trajectories<-subset(trajectories,year>2010)
+trajectories<-subset(trajectories,year<2120)
 
-traj_boot<-aggregate(bootpreds$Popsize,by=list(bootpreds$scenarioname,bootpreds$Year),FUN=quantile,probs=c(0.025,0.975))
-traj_boot<-traj_boot[order(traj_boot$Group.1),]
+traj_boot<-aggregate(bootpreds$Popsize,by=list(bootpreds$scenarioname,bootpreds$Year),FUN=quantile,probs=c(0.05,0.95))
+
 traj_boot<-data.frame(scenario=traj_boot$Group.1,year=traj_boot$Group.2,lower=traj_boot$x[,1],upper=traj_boot$x[,2])
 traj_boot$year<-as.numeric(as.character(traj_boot$year))
 
 
-p1+ 
-  geom_line(data=trajectories,aes(x=year,y=mean,color=scenario))+
-  guides(col=guide_legend(ncol=1))+
-  theme(legend.text=element_text(size=8))
-
-p1+ 
-  geom_ribbon(data=traj_boot,aes(x=year,ymin=lower,ymax=upper,fill=scenario),alpha=0.02)+
+p3<-ggplot(data=newdf2)+
+  geom_ribbon(aes(x=year,ymin=psizeLow,ymax=psizeUpp),fill="blue",alpha=0.2)+
+  geom_line(aes(x=year,y=psize),color="blue")+
+  geom_vline(xintercept = 2007,  size=0.5,linetype="dashed")+
+  geom_errorbarh(aes(xmax=2040,xmin=2018,y=126000,height=20000))+
+  guides(fill = guide_legend(reverse=TRUE),color=guide_legend(reverse=TRUE))+
+  labs(x = "Years", y="Population size (males)", fill="",color="")+
+  scale_y_continuous(labels = comma)+
+  annotate("text", x= 2008, y = 400000,hjust=0, label = paste0("BRT model reference year (2007) \n", paste0("Estimate (90% CI) = ",round(popsize,0)," (",round(popsize.low,0)," - ",round(popsize.upp,0),")")),size=4)+
+  annotate("text", x= 2029, y = 155000, label = ("Predictions with BBS long-term trend (2017): \n -1.78 (-3.560, 0.124)"),size=4)+
+  geom_rug(data=yearsdata, aes(x=Year,y=Freq),length=unit(yearsdata$Freq/50000,"npc"),sides="b", alpha=0.5, position=jitter)+
+  geom_errorbar(data=traj_boot,aes(x=year,ymin=lower,ymax=upper,color=scenario),position=position_dodge(width=3),width=20,alpha=0.5)+
+  geom_errorbarh(aes(xmax=2100,xmin=2020,y=68000,height=20000))+
+  annotate("text", x= 2050, y = 80000,angle=0, label = "Predictions with LANDIS-II simulations",size=4, hjust=0)+
   geom_line(data=subset(trajectories,year<2101),aes(x=year,y=mean,color=scenario))+
-  theme(legend.position = "none")
+  guides(col=guide_legend(ncol=1))+
+  theme(legend.text=element_text(size=8))+
+  annotate("text", x= 2100, y = 300000,angle=0, label = "Bootstrap 90%CI (2100)",size=4, hjust=1)
+p3
 
 #save.image("D:/CHID regional NS BRT/BRT_outputs/outputs2.RData")
 
@@ -1855,29 +1899,83 @@ fut.trend.df2<-as.data.frame(matrix(unlist(lapply(1:24,FUN=futuretrend2)),ncol=3
 fut.trend.df2$scenario<-as.factor(scenario.names)
 fut.trend.df2
 
+write.csv(fut.trend.df2,"D:/CHID regional NS BRT/November 2019 meetings/future_trends.csv")
+
 fut.trend.df2$maxmin<-3
 fut.trend.df2$maxmin[(which.min(fut.trend.df2$trend))]<-1
 fut.trend.df2$maxmin[(which.max(fut.trend.df2$trend))]<-2
 
 
 fut.trends.plot2<-ggplot(fut.trend.df2,aes(x=trend,y=scenario,color=factor(maxmin)))+
-  geom_point()+xlim(-8,8)+
+  geom_point()+xlim(-4,4)+
   geom_errorbarh(data=fut.trend.df2,aes(xmax=upperCL,xmin=lowerCL,color=factor(maxmin)))+
   labs(x="Future trend (2017-2100)",y="Scenario")+
   scale_color_manual(labels=c("Minimum","Maximum","Others"),values=c("Red","Blue", "Black")) +
   theme(legend.title = element_blank())
-
 fut.trends.plot2
 
-#7. Estimate distribution function for future trend
 
+# Estimate distribution function for future trend ####
+# As we can see from plot above, CL are also not symetrical with the mean
+# So need to use a distribution that can allow asymetrical shapes AND negative values
+# enter the Exponentially Modified Gaussian (EMG) Distribution
 
+library(emg)
 
+findEMG<-function(x,mu.init,sigma.init,lambda.init,N=10){
+  low<-as.numeric(x[2])
+  upp<-as.numeric(x[3])
+  mat<-expand.grid(mu=runif(N,min=min(mu.init),max=max(mu.init)),sigma=runif(N,min=sigma.init[1],max=sigma.init[2]),lambda=runif(N,min=lambda.init[1],max=lambda.init[2]))
+  mat[,4:5]<-t(apply(mat,1,FUN = function(x){qemg(p=c(0.05,0.95),mu=x[1],sigma=x[2],lambda=x[3])}))
+  mat$distances<-pointDistance(p1=mat[,4:5],p2=c(low,upp),lonlat = F)
+  out1<-mat[which.min(mat$distances),]
+  
+  mu.init2<-unlist(c(out1[1]-(out1[1]*0.25),out1[1]+(out1[1]*0.25)))
+  sigma.init2<-unlist(c(out1[2]-(out1[2]*0.25),out1[2]+(out1[2]*0.25)))
+  lambda.init2<-unlist(c(out1[3]-(out1[3]*0.25),out1[3]+(out1[3]*0.25)))
+  
+  mat2<-expand.grid(mu=runif(N,min=min(mu.init2),max=max(mu.init2)),sigma=runif(N,min=min(sigma.init2),max=max(sigma.init2)),lambda=runif(N,min=lambda.init2[1],max=lambda.init2[2]))
+  mat2[,4:5]<-t(apply(mat,1,FUN = function(x){qemg(p=c(0.05,0.95),mu=x[1],sigma=x[2],lambda=x[3])}))
+  mat2$distances<-pointDistance(p1=mat2[,4:5],p2=c(low,upp),lonlat = F)
+  
+  mat3<-rbind(mat,mat2)
+  colnames(mat3)[4:5]<-c("lowerCL_0.5","upperCL_0.95")
+  return(mat3[which.min(mat3$distances),])
+}
+
+library(pbapply)
+EMGparams2100<-pbapply(fut.trend.df2, MARGIN=1, FUN=findEMG,mu.init=c(-2,2),sigma.init=c(0.5,5),lambda.init=c(0.1,1),N=25)
+EMGparams2100<-as.data.frame(matrix(unlist(EMGparams2100),ncol=6,nrow=24,byrow=T, dimnames=list(1:24,names(EMGparams2100[[1]]))))
 
 #8. Generate plot for future trend distribution function
+pop.prob.2100<-as.list(scenarios2100$scenario)
+names(pop.prob.2100)<-scenarios2100$scenario
 
+id.df.fut.trend.2100<-data.frame("Trend"=NA,"Probability"=NA,"scenario"=NA)
+for(i in 1:length(pop.prob.2100)){
+  fut.trend.range<-seq(-4,5,length.out=350)
+  id.dist.fut.trend.2100<-pemg(fut.trend.range,mu=EMGparams2100$mu[i],sigma=EMGparams2100$sigma[i],lambda=EMGparams2100$lambda[i],lower.tail = F)
+  
+  id.df.fut.trend.2100[(1:length(fut.trend.range))+length(fut.trend.range)*(i-1),]<-cbind(fut.trend.range,id.dist.fut.trend.2100,names(pop.prob.2100)[i])
+}
 
-### Summarize current predictions by land cover type ####
+id.df.fut.trend.2100$Trend<-as.numeric(id.df.fut.trend.2100$Trend)
+id.df.fut.trend.2100$Probability<-as.numeric(id.df.fut.trend.2100$Probability)
+str(id.df.fut.trend.2100)
+
+trend.prob.2100.plot<-ggplot(id.df.fut.trend.2100, aes(x = Trend, y = Probability,color=scenario)) +
+  geom_point(alpha=0.6)+
+  geom_vline(mapping=aes(xintercept = trend,color=scenario),data=fut.trend.df2, size=0.8,alpha=0.4)+
+  #annotate("text", x= 55000, y = 0.93,angle=0, label = paste0("Future trend predictions \n (mean = ",round(mean(fut.trend.df2$trend),0),")"),size=4, hjust=0)+
+  #annotate("text", x= 150000, y = 0.93,angle=0, label = paste0("Scenario: ",scenarios2100$scenario[i]),size=4)+
+  xlim(-4,5)+
+  ylim(0,1)+
+  scale_color_discrete(guide=guide_legend(ncol=1))+
+  #scale_x_continuous(labels = scales::comma)+
+  labs(x="T",y="Probability (Trend >= T)")
+trend.prob.2100.plot
+
+### Summarize current predictions by land cover type and CTI ####
 
 ##MODIS-based landcover (250-m)
 nalc2005<-raster("M:/DataStuff/SpatialData/LCC05_NALCMS2010/Land_Cover_MXD/NA_LandCover_2005/data/NA_LandCover_2005/NA_LandCover_2005_LCC.img")
@@ -1932,6 +2030,8 @@ CTI<-raster("D:/CTI/CTI_NS.tif")
 CTI<-projectRaster(CTI,rast2)
 CTI<-mask(CTI,rast2)
 
+CTIv<-getValues(CTI)
+
 pred1$CTIq<-NA
 pred1$CTIq[which(CTIv<6.9)]<-"Q1"
 pred1$CTIq[which(6.9<CTIv&CTIv<7)]<-"Q2"
@@ -1979,5 +2079,37 @@ plot(mess1)
 writeRaster(mess1, filename="D://CHID regional NS BRT/BRT_outputs/GFsigma250m/mess_brt_predsGF250m.tif", format="GTiff",overwrite=TRUE)
 
 
+# Plot current model predictions and CIs ####
+png("D://CHID regional NS BRT/November 2019 meetings/preds_allpoints.png",width=1080,height=700)
+par(mar=c(0.5, 0.5, 0.5, 0.5))
+plot(rast,  zlim = c(0, (0.15)),xaxt="n",yaxt="n",legend.width=1,legend.args = list(text = 'Density (males/ha)',side=4,line=2.5,cex=1,font=2))
+points(datcombo_sp,pch=16,col=alpha(1,0.5), cex = 0.8)
+dev.off()
 
+pointsplot<-subset(datcombo_sp,ABUND>0)
 
+png("D://CHID regional NS BRT/November 2019 meetings/preds_allpresences.png",width=1080,height=700)
+par(mar=c(0.5, 0.5, 0.5, 0.5))
+plot(rast, zlim = c(0, (0.15)),xaxt="n",yaxt="n",legend.width=1,legend.args = list(text = 'Density (males/ha)',side=4,line=2.5,cex=1,font=2))
+points(pointsplot,pch=16,col=alpha(1,0.5), cex = 0.8)
+dev.off()
+
+png("D://CHID regional NS BRT/November 2019 meetings/preds_nopoints.png",width=1080,height=700)
+par(mar=c(0.5, 0.5, 0.5, 0.5))
+plot(rast,  zlim = c(0, (0.15)),xaxt="n",yaxt="n",legend.width=1,legend.args = list(text = 'Density (males/ha)',side=4,line=2.5,cex=1,font=2))
+dev.off()
+
+png("D://CHID regional NS BRT/November 2019 meetings/predsLower_nopoints.png",width=1080,height=700)
+par(mar=c(0.5, 0.5, 0.5, 0.5))
+plot(lower,  zlim = c(0, (0.15)),xaxt="n",yaxt="n",legend.width=1,legend.args = list(text = 'Density (males/ha)',side=4,line=2.5,cex=1,font=2))
+dev.off()
+
+png("D://CHID regional NS BRT/November 2019 meetings/predsUpper_nopoints.png",width=1080,height=700)
+par(mar=c(0.5, 0.5, 0.5, 0.5))
+plot(upper,  zlim = c(0, (0.15)),xaxt="n",yaxt="n",legend.width=1,legend.args = list(text = 'Density (males/ha)',side=4,line=2.5,cex=1,font=2))
+dev.off()
+
+png("D://CHID regional NS BRT/November 2019 meetings/predsLANDISarea_nopoints.png",width=1080,height=700)
+par(mar=c(0.5, 0.5, 0.5, 0.5))
+plot(rast2,  zlim = c(0, (0.15)),xaxt="n",yaxt="n",legend.width=1,legend.args = list(text = 'Density (males/ha)',side=4,line=2.5,cex=1,font=2))
+dev.off()
